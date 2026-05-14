@@ -1,0 +1,38 @@
+@RehearsalRoomAPI_HostAddress = http://localhost:5281
+
+### Get all songs
+GET {{RehearsalRoomAPI_HostAddress}}/songs
+Accept: application/json
+
+###
+
+### Get song by id
+GET {{RehearsalRoomAPI_HostAddress}}/songs/1
+Accept: application/json
+
+###
+
+### Add a new song
+POST {{RehearsalRoomAPI_HostAddress}}/songs
+Content-Type: application/json
+
+{
+  "title": "Way Maker",
+  "key": "E",
+  "format": "Verse → Chorus"
+}
+
+###
+### Update a song
+PUT {{RehearsalRoomAPI_HostAddress}}/songs/2
+Content-Type: application/json
+
+{
+  "title": "Great Jehovah (Updated)",
+  "key": "G",
+  "format": "Intro → Verse → Chorus → Vamp"
+}
+
+###
+### Delete a song
+DELETE {{RehearsalRoomAPI_HostAddress}}/songs/1

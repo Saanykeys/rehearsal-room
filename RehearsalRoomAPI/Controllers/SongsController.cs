@@ -43,6 +43,7 @@ namespace RehearsalRoomAPI.Controllers
             return songs.Select(ToSongResponseDto);
         }
 
+       
         [HttpPost]
         public async Task<ActionResult<SongResponseDto>> Create(CreateSongDto dto)
         {
@@ -59,6 +60,7 @@ namespace RehearsalRoomAPI.Controllers
 
             return Ok(ToSongResponseDto(song));
         }
+
 
         [HttpPut("{id}")]
         public async Task<ActionResult<SongResponseDto>> Update(int id, UpdateSongDto dto)
@@ -104,7 +106,8 @@ namespace RehearsalRoomAPI.Controllers
                 Title = song.Title,
                 Key = song.Key,
                 Format = song.Format,
-                YouTubeLink = song.YouTubeLink
+                YouTubeLink = song.YouTubeLink,
+AudioFileName = song.AudioFileName
             };
         }
     }

@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import rehearsalLogo from "./assets/rehearsalroom-logo.png";
+import LandingPage from "./pages/LandingPage";
+import AdminDashboard from "./components/AdminDashboard";
+import MemberDashboard from "./components/MemberDashboard";
 
 const API_BASE = "http://localhost:5281";
 
 function App() {
+  //return <LandingPage />; 
+  
   const [songs, setSongs] = useState([]);
   const [choirMembers, setChoirMembers] = useState([]);
   const [rehearsalEvents, setRehearsalEvents] = useState([]);
@@ -24,7 +29,14 @@ const [rehearsalMode, setRehearsalMode] = useState(false);
     title: "",
     eventDate: "",
     notes: "",
+
   });
+
+  const [songSuggestions, setSongSuggestions] = useState([]);
+const [suggestionTitle, setSuggestionTitle] = useState("");
+const [suggestionArtist, setSuggestionArtist] = useState("");
+const [suggestionYouTubeLink, setSuggestionYouTubeLink] = useState("");
+const [suggestionReason, setSuggestionReason] = useState("");
 
   const [showAddSong, setShowAddSong] = useState(false);
   const [newSong, setNewSong] = useState({
@@ -32,6 +44,7 @@ const [rehearsalMode, setRehearsalMode] = useState(false);
     key: "",
     format: "",
     youTubeLink: "",
+    audioFile: null,
   });
 
   const [editingSong, setEditingSong] = useState(null);
@@ -71,13 +84,50 @@ const [rehearsalMode, setRehearsalMode] = useState(false);
   const [registerSuccess, setRegisterSuccess] = useState("");
 
   const isAdmin = currentUser?.role === "Admin";
+return <AdminDashboard />;
 
   const canUpdateMemberAttendance = (member) => {
     if (isAdmin) return true;
     return member.userId === currentUser?.id;
   };
+const submitSongSuggestion = async () => {
+  try {
+    const response = await fetch(
+      "http://localhost:5281/api/SongSuggestions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: suggestionTitle,
+          artist: suggestionArtist,
+          youtubeLink: suggestionYouTubeLink,
+          reason: suggestionReason,
+          suggestedBy: currentUser?.fullName || "Anonymous",
+        }),
+      }
+    );
 
-  const filteredSongs = songs
+    const data = await response.json();
+
+    setSongSuggestions((prev) => [...prev, data]);
+
+    setSuggestionTitle("");
+    setSuggestionArtist("");
+    setSuggestionYouTubeLink("");
+    setSuggestionReason("");
+
+    alert("Song suggestion submitted!");
+  } catch (error) {
+    console.error(error);
+    alert("Failed to submit suggestion");
+  }
+};
+
+const filteredSongs = songs
+
+
     .filter((song) => {
       const search = searchTerm.toLowerCase();
 
@@ -153,6 +203,19 @@ fetch(`${API_BASE}/api/RehearsalEvents`)
       .then((res) => res.json())
       .then((data) => setAttendanceRecords(data))
       .catch((err) => console.error(err));
+
+
+fetch(`${API_BASE}/api/SongSuggestions`)
+  .then((res) => res.json())
+  .then((data) => setSongSuggestions(data))
+  .catch((err) => console.error(err));
+
+
+
+
+
+
+
   }, [currentUser]);
 
   const login = async (e) => {
@@ -262,13 +325,21 @@ fetch(`${API_BASE}/api/RehearsalEvents`)
       return;
     }
 
-    fetch(`${API_BASE}/songs`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(newSong),
-    })
+ const formData = new FormData();
+
+formData.append("title", newSong.title);
+formData.append("key", newSong.key);
+formData.append("format", newSong.format);
+formData.append("youTubeLink", newSong.youTubeLink);
+
+if (newSong.audioFile) {
+  formData.append("audioFile", newSong.audioFile);
+}
+
+fetch(`${API_BASE}/songs`, {
+  method: "POST",
+  body: formData,
+})
       .then((res) => res.json())
       .then((createdSong) => {
         setSongs([...songs, createdSong]);
@@ -538,13 +609,13 @@ const assignSongToRehearsal = (rehearsalEventId) => {
       <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 px-6 text-white">
         <form
           onSubmit={registerMember}
-          className="w-full max-w-md rounded-3xl border border-white/10 bg-white/10 p-8 shadow-2xl backdrop-blur"
+          className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg backdrop-blur-md"
         >
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
   <img
     src={rehearsalLogo}
     alt="Rehearsal Room Logo"
-    className="h-16 w-16 rounded-2xl object-cover shadow-lg shadow-amber-900/30"
+    className="h-12 w-12 rounded-2xl object-cover shadow-lg shadow-amber-900/30"
   />
 
   <div>
@@ -552,7 +623,7 @@ const assignSongToRehearsal = (rehearsalEventId) => {
       Rehearsal Room
     </p>
 
-    <h1 className="mt-1 text-3xl font-bold">Song Library</h1>
+    <h1 className="mt-1 text-xl font-bold">Song Library</h1>
   </div>
 </div>
 
@@ -640,13 +711,13 @@ const assignSongToRehearsal = (rehearsalEventId) => {
       <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 px-6 text-white">
         <form
           onSubmit={login}
-          className="w-full max-w-md rounded-3xl border border-white/10 bg-white/10 p-8 shadow-2xl backdrop-blur"
+          className="w-full max-w-md rounded-2xl border border-white/10 bg-white/10 p-5 shadow-1g backdrop-blur"
         >
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-300">
             Rehearsal Room
           </p>
 
-          <h1 className="mt-4 text-4xl font-bold">Login</h1>
+          <h1 className="mt-4 text-2xl font-bold">Login</h1>
 
           <p className="mt-3 text-slate-300">
             Sign in to view songs and rehearsal attendance.
@@ -700,12 +771,12 @@ const assignSongToRehearsal = (rehearsalEventId) => {
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 text-white">
       <section className="mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-8">
-        <nav className="flex items-center justify-between gap-4">
-         <div className="flex items-center gap-4">
+        <nav className="flex items-center justify-between gap-3">
+         <div className="flex items-center gap-3">
   <img
     src={rehearsalLogo}
     alt="Rehearsal Room Logo"
-    className="h-16 w-16 rounded-2xl object-cover shadow-lg shadow-amber-900/30"
+    className="h-12 w-12 rounded-2xl object-cover shadow-lg shadow-amber-900/30"
   />
 
   <div>
@@ -713,7 +784,7 @@ const assignSongToRehearsal = (rehearsalEventId) => {
       Rehearsal Room
     </p>
 
-    <h1 className="mt-1 text-3xl font-bold">Song Library</h1>
+    <h1 className="mt-1 text-xl font-bold">Song Library</h1>
   </div>
 </div>
 
@@ -759,8 +830,8 @@ const assignSongToRehearsal = (rehearsalEventId) => {
         </nav>
 
         {isAdmin && (
-          <div className="mt-6 rounded-3xl border border-amber-300/20 bg-amber-300/10 p-5">
-            <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div className="mt-4 rounded-xl border border-amber-300/10 bg-white/5 px-4 py-3 shadow-md">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="font-semibold text-amber-100">
                   Choir Member Invite Link
@@ -783,7 +854,7 @@ const assignSongToRehearsal = (rehearsalEventId) => {
           </div>
         )}
 
-        <div className="mt-12 rounded-3xl border border-white/10 bg-white/10 p-8 shadow-2xl backdrop-blur">
+        <div className="mt-12 rounded-2xl border border-white/10 bg-white/10 p-5 shadow-1g backdrop-blur">
           <p className="text-sm font-semibold uppercase tracking-[0.25em] text-amber-300">
             Welcome Back, {currentUser.fullName}
           </p>
@@ -792,7 +863,7 @@ const assignSongToRehearsal = (rehearsalEventId) => {
             Find the right song for rehearsal, fast.
           </h2>
 
-          <div className="mt-8 flex flex-col gap-4 md:flex-row">
+          <div className="mt-8 flex flex-col gap-3 md:flex-row">
             <input
               type="text"
               placeholder="Search by song title, key, or format..."
@@ -813,14 +884,57 @@ const assignSongToRehearsal = (rehearsalEventId) => {
           </div>
         </div>
 
+<div className="mt-6 grid gap-4 md:grid-cols-4">
+  <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg">
+    <p className="text-sm text-slate-400">Total Songs</p>
+    <p className="mt-2 text-2xlfont-bold text-white">{songs.length}</p>
+    <p className="mt-2 text-sm text-amber-300">Song library</p>
+  </div>
+
+  <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg">
+    <p className="text-sm text-slate-400">Members</p>
+    <p className="mt-2 text-2xl font-bold text-white">{totalMembers}</p>
+    <p className="mt-2 text-sm text-green-300">Choir roster</p>
+  </div>
+
+  <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg">
+    <p className="text-sm text-slate-400">Attending</p>
+    <p className="mt-2 text-2xlfont-bold text-white">
+      {attendingCount}
+    </p>
+    <p className="mt-2 text-sm text-blue-300">For rehearsal</p>
+  </div>
+
+  <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg">
+    <p className="text-sm text-slate-400">Audio Uploads</p>
+    <p className="mt-2 text-2xl font-bold text-white">
+      {songs.filter((song) => song.audioFileName).length}
+    </p>
+    <p className="mt-2 text-sm text-purple-300">Practice tracks</p>
+  </div>
+</div>
+
+
+
+
+
+
+
+
+<div className="flex flex-col gap-2">
+  ...
+</div>
+
+
+
         {showAddSong && isAdmin && (
           <form
             onSubmit={addSong}
-            className="mt-8 rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl backdrop-blur"
+            className="mt-8 rounded-2xl border border-white/10 bg-white/10 p-6 shadow-1g backdrop-blur"
           >
             <h2 className="text-2xl font-bold">Add New Song</h2>
 
-            <div className="mt-5 grid gap-4 md:grid-cols-4">
+            <div className="mt-5 grid gap-3 md:grid-cols-4">
               <input
                 type="text"
                 placeholder="Song title"
@@ -874,6 +988,32 @@ const assignSongToRehearsal = (rehearsalEventId) => {
               />
             </div>
 
+<div className="flex flex-col gap-2">
+  <label className="text-sm text-slate-300">
+    Rehearsal Audio
+  </label>
+
+  <input
+    type="file"
+    accept=".mp3,.wav,.m4a,audio/*"
+    onChange={(e) =>
+      setNewSong({
+        ...newSong,
+        audioFile: e.target.files[0],
+      })
+    }
+    className="rounded-2xl border border-white/10 bg-slate-950/70 px-5 py-3 text-white outline-none"
+  />
+</div>
+
+
+
+
+
+
+
+            
+
             <div className="mt-5 flex gap-3">
               <button
                 type="submit"
@@ -896,11 +1036,11 @@ const assignSongToRehearsal = (rehearsalEventId) => {
         {editingSong && isAdmin && (
           <form
             onSubmit={updateSong}
-            className="mt-8 rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl backdrop-blur"
+            className="mt-8 rounded-2xl border border-white/10 bg-white/10 p-6 shadow-1g backdrop-blur"
           >
             <h2 className="text-2xl font-bold">Edit Song</h2>
 
-            <div className="mt-5 grid gap-4 md:grid-cols-4">
+            <div className="mt-5 grid 3 md:grid-cols-4">
               <input
                 type="text"
                 placeholder="Song title"
@@ -973,14 +1113,14 @@ const assignSongToRehearsal = (rehearsalEventId) => {
           </form>
         )}
 
-        <section className="mt-10 rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl backdrop-blur">
+        <section className="mt-10 rounded-2xl border border-white/10 bg-white/10 p-6 shadow-1g backdrop-blur">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.25em] text-amber-300">
                 Rehearsal Events
               </p>
 
-              <h2 className="mt-2 text-3xl font-bold">Upcoming Rehearsals</h2>
+              <h2 className="mt-2 text-xl font-bold">Upcoming Rehearsals</h2>
             </div>
 
             {isAdmin && (
@@ -996,9 +1136,9 @@ const assignSongToRehearsal = (rehearsalEventId) => {
           {showAddEvent && (
             <form
               onSubmit={addRehearsalEvent}
-              className="mt-6 rounded-3xl border border-white/10 bg-slate-950/40 p-5"
+              className="mt-6 rounded-2xl border border-white/10 bg-slate-950/40 p-5"
             >
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-3">
                 <input
                   type="text"
                   placeholder="Event title"
@@ -1057,7 +1197,7 @@ const assignSongToRehearsal = (rehearsalEventId) => {
             </form>
           )}
 
-          <div className="mt-6 grid gap-4">
+          <div className="mt-6 grid gap-3">
             {rehearsalEvents.length > 0 ? (
               rehearsalEvents.map((event) => (
                 <div
@@ -1157,34 +1297,107 @@ const assignSongToRehearsal = (rehearsalEventId) => {
     rehearsalMode ? "md:grid-cols-1" : ""
   }`}
 >
+
+<div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-6">
+  <h2 className="mb-4 text-2xl font-bold text-white">
+    Song Suggestions
+  </h2>
+
+  <div className="grid gap-4">
+    <input
+      type="text"
+      placeholder="Song Title"
+      value={suggestionTitle}
+      onChange={(e) => setSuggestionTitle(e.target.value)}
+      className="rounded-xl border border-white/10 bg-slate-900 p-3 text-white"
+    />
+
+    <input
+      type="text"
+      placeholder="Artist"
+      value={suggestionArtist}
+      onChange={(e) => setSuggestionArtist(e.target.value)}
+      className="rounded-xl border border-white/10 bg-slate-900 p-3 text-white"
+    />
+
+    <input
+      type="text"
+      placeholder="YouTube Link"
+      value={suggestionYouTubeLink}
+      onChange={(e) => setSuggestionYouTubeLink(e.target.value)}
+      className="rounded-xl border border-white/10 bg-slate-900 p-3 text-white"
+    />
+
+    <textarea
+      placeholder="Why should we sing this song?"
+      value={suggestionReason}
+      onChange={(e) => setSuggestionReason(e.target.value)}
+      className="rounded-xl border border-white/10 bg-slate-900 p-3 text-white"
+    />
+
+    <button
+      onClick={submitSongSuggestion}
+      className="rounded-xl bg-amber-400 px-4 py-3 font-semibold text-slate-900 hover:bg-amber-300"
+    >
+      Submit Suggestion
+    </button>
+  </div>
+</div>
+
+
+
+
+
+
           {filteredSongs.length > 0 ? (
             filteredSongs.map((song) => (
               <div
                 key={song.id}
-                className={`rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur ${
+                className={`rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur ${
   rehearsalMode
-    ? "flex flex-col items-start gap-4"
+    ? "flex flex-col items-start gap-3"
     : "flex items-center justify-between"
 }`}
               >
                 <div>
-                  <h3 className="text-2xl font-semibold">{song.title}</h3>
+                  <h3 className="text-2xlfont-bold text-white">
+  <h3 className="text-2xl font-bold text-white">
+  🎵 {song.title}
+</h3>
+</h3>
+<div className="mt-3 flex flex-wrap gap-2">
+  <span className="rounded-full bg-purple-500/20 px-3 py-1 text-sm text-purple-200">
+    Key: {song.key}
+  </span>
 
-                  <p className="mt-2 text-slate-300">
-                    Key: {song.key} | {song.format}
-                  </p>
+  <span className="rounded-full bg-blue-500/20 px-3 py-1 text-sm text-blue-200">
+    Format: {song.format}
+  </span>
+</div>
 
                   {song.youTubeLink && (
                     <a
                       href={song.youTubeLink}
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-3 inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500"
+                      className="mt-2 inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500"
                     >
                       <span>▶</span>
                       Watch on YouTube
-                    </a>
+                    </a> 
                   )}
+
+{song.audioFileName && (
+  <audio controls className="mt-4 w-full rounded-xl">
+    <source
+      src={`http://localhost:5281/audio/${song.audioFileName}`}
+      type="audio/mpeg"
+    />
+  </audio>
+)}
+
+
+
                 </div>
 
                 {isAdmin && (
@@ -1207,20 +1420,20 @@ const assignSongToRehearsal = (rehearsalEventId) => {
               </div>
             ))
           ) : (
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-center text-slate-300">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-slate-300">
               No songs found.
             </div>
           )}
         </section>
 
-        <section className="mt-12 rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl backdrop-blur">
+        <section className="mt-12 rounded-2xl border border-white/10 bg-white/10 p-6 shadow-1g backdrop-blur">
           <div className="mb-6 flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.25em] text-amber-300">
                 Rehearsal Attendance
               </p>
 
-              <h2 className="mt-2 text-3xl font-bold">
+              <h2 className="mt-2 text-xl font-bold">
                 Will you be at rehearsal?
               </h2>
 
@@ -1250,34 +1463,34 @@ const assignSongToRehearsal = (rehearsalEventId) => {
           </div>
 
           {selectedEventId && (
-            <div className="mb-6 grid gap-4 md:grid-cols-5">
+            <div className="mb-6 grid gap-3 md:grid-cols-5">
               <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-5">
                 <p className="text-sm text-slate-400">Total Members</p>
-                <p className="mt-2 text-3xl font-bold">{totalMembers}</p>
+                <p className="mt-2 text-xlfont-bold">{totalMembers}</p>
               </div>
 
               <div className="rounded-2xl border border-green-400/20 bg-green-500/10 p-5">
                 <p className="text-sm text-green-200">Attending</p>
-                <p className="mt-2 text-3xl font-bold text-green-300">
+                <p className="mt-2 text-xl font-bold text-green-300">
                   {attendingCount}
                 </p>
               </div>
 
               <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-5">
                 <p className="text-sm text-red-200">Not Attending</p>
-                <p className="mt-2 text-3xl font-bold text-red-300">
+                <p className="mt-2 text-xl font-bold text-red-300">
                   {notAttendingCount}
                 </p>
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-5">
                 <p className="text-sm text-slate-400">No Response</p>
-                <p className="mt-2 text-3xl font-bold">{noResponseCount}</p>
+                <p className="mt-2 text-xl font-bold">{noResponseCount}</p>
               </div>
 
               <div className="rounded-2xl border border-amber-300/30 bg-amber-300/10 p-5">
                 <p className="text-sm text-amber-200">Attendance</p>
-                <p className="mt-2 text-3xl font-bold text-amber-300">
+                <p className="mt-2 text-xl font-bold text-amber-300">
                   {attendancePercentage}%
                 </p>
               </div>
@@ -1306,7 +1519,7 @@ const assignSongToRehearsal = (rehearsalEventId) => {
             </form>
           )}
 
-          <div className="grid gap-4">
+          <div className="grid gap-3">
             {choirMembers.map((member) => {
               const canEditThisMember = canUpdateMemberAttendance(member);
 

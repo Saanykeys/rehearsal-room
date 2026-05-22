@@ -11,6 +11,7 @@ namespace RehearsalRoomAPI.Data
         }
 
         public DbSet<Song> Songs { get; set; }
+       public DbSet<SongSuggestion> SongSuggestions { get; set; }
 public DbSet<RehearsalSong> RehearsalSongs { get; set; }
 
         public DbSet<ChoirMember> ChoirMembers { get; set; }

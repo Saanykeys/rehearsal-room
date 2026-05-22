@@ -149,3 +149,4 @@ C:\Users\saany\OneDrive\Desktop\RehearsalRoomClean\RehearsalRoomAPI\bin\Debug\ne
 C:\Users\saany\OneDrive\Desktop\RehearsalRoomClean\RehearsalRoomAPI\bin\Debug\net10.0\Swashbuckle.AspNetCore.Swagger.dll
 C:\Users\saany\OneDrive\Desktop\RehearsalRoomClean\RehearsalRoomAPI\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerGen.dll
 C:\Users\saany\OneDrive\Desktop\RehearsalRoomClean\RehearsalRoomAPI\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+C:\Users\saany\OneDrive\Desktop\RehearsalRoomClean\RehearsalRoomAPI\obj\Debug\net10.0\RehearsalRoomAPI.sourcelink.json

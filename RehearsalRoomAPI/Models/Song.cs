@@ -16,5 +16,7 @@ namespace RehearsalRoomAPI.Models
         public string Format { get; set; } = string.Empty;
 
         public string YouTubeLink { get; set; } = string.Empty;
+
+        public string AudioFileName { get; set; } = string.Empty;
     }
 }

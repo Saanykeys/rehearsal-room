@@ -4,7 +4,6 @@ using RehearsalRoomAPI.Data;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
-
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -32,22 +31,15 @@ var app = builder.Build();
 
 app.UseCors("AllowReactApp");
 
-app.UseSwagger();
-app.UseSwaggerUI();
-
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-    db.Database.ExecuteSqlRaw(@"
-        CREATE TABLE IF NOT EXISTS Members (
-            Id INTEGER PRIMARY KEY AUTOINCREMENT,
-            FullName TEXT NOT NULL,
-            Email TEXT NOT NULL,
-            Role TEXT NOT NULL
-        );
-    ");
+    db.Database.Migrate();
 }
+
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.MapControllers();
 

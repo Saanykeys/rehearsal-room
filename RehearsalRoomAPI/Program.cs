@@ -30,6 +30,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 var app = builder.Build();
 
+app.UseCors("AllowReactApp");
+
+app.UseSwagger();
+app.UseSwaggerUI();
+
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -43,11 +48,6 @@ using (var scope = app.Services.CreateScope())
         );
     ");
 }
-
-app.UseCors("AllowReactApp");
-
-app.UseSwagger();
-app.UseSwaggerUI();
 
 app.MapControllers();
 

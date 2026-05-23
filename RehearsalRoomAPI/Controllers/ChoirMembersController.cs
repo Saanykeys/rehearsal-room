@@ -2,11 +2,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RehearsalRoomAPI.Data;
 using RehearsalRoomAPI.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace RehearsalRoomAPI.Controllers;
 
 [ApiController]
 [Route("choirmembers")]
+//[Authorize]
 public class ChoirMembersController : ControllerBase
 {
     private readonly AppDbContext _context;

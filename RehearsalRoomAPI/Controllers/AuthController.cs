@@ -1,8 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using RehearsalRoomAPI.Data;
 using RehearsalRoomAPI.Models;
-using System.Security.Cryptography;
+using RehearsalRoomAPI.Models.Auth;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace RehearsalRoomAPI.Controllers
 {
@@ -11,10 +15,12 @@ namespace RehearsalRoomAPI.Controllers
     public class AuthController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IConfiguration _configuration;
 
-        public AuthController(AppDbContext context)
+        public AuthController(AppDbContext context, IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration;
         }
 
         [HttpPost("register")]
@@ -25,41 +31,21 @@ namespace RehearsalRoomAPI.Controllers
 
             if (existingUser != null)
             {
-                return BadRequest("A user with this email already exists.");
+                return BadRequest("Email already exists.");
             }
 
             var user = new User
             {
                 FullName = request.FullName,
                 Email = request.Email,
-                PasswordHash = HashPassword(request.Password),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
                 Role = request.Role
             };
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            if (user.Role == "ChoirMember")
-            {
-                var choirMember = new ChoirMember
-                {
-                    Name = user.FullName,
-                    Attending = false,
-                    UserId = user.Id
-                };
-
-                _context.ChoirMembers.Add(choirMember);
-                await _context.SaveChangesAsync();
-            }
-
-            return Ok(new
-            {
-                message = "User registered successfully",
-                user.Id,
-                user.FullName,
-                user.Email,
-                user.Role
-            });
+            return Ok(CreateAuthResponse(user, "User registered successfully"));
         }
 
         [HttpPost("login")]
@@ -73,73 +59,67 @@ namespace RehearsalRoomAPI.Controllers
                 return Unauthorized("Invalid email or password.");
             }
 
-            var passwordValid = VerifyPassword(request.Password, user.PasswordHash);
+            var passwordValid = BCrypt.Net.BCrypt.Verify(
+                request.Password,
+                user.PasswordHash
+            );
 
             if (!passwordValid)
             {
                 return Unauthorized("Invalid email or password.");
             }
 
-            return Ok(new
-            {
-                message = "Login successful",
-                user.Id,
-                user.FullName,
-                user.Email,
-                user.Role
-            });
+            return Ok(CreateAuthResponse(user, "Login successful"));
         }
 
-        private string HashPassword(string password)
+        private object CreateAuthResponse(User user, string message)
         {
-            byte[] salt = RandomNumberGenerator.GetBytes(16);
-
-            var hash = Rfc2898DeriveBytes.Pbkdf2(
-                password,
-                salt,
-                100000,
-                HashAlgorithmName.SHA256,
-                32
-            );
-
-            return Convert.ToBase64String(salt) + "." + Convert.ToBase64String(hash);
+            return new
+            {
+                message,
+                id = user.Id,
+                fullName = user.FullName,
+                email = user.Email,
+                role = user.Role,
+                token = CreateToken(user)
+            };
         }
 
-        private bool VerifyPassword(string password, string storedHash)
+        private string CreateToken(User user)
         {
-            var parts = storedHash.Split('.');
-
-            if (parts.Length != 2)
+            var claims = new List<Claim>
             {
-                return false;
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.FullName),
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Role, user.Role)
+            };
+
+            var jwtKey = _configuration["Jwt:Key"];
+
+            if (string.IsNullOrWhiteSpace(jwtKey))
+            {
+                throw new Exception("JWT Key is missing from appsettings.json.");
             }
 
-            byte[] salt = Convert.FromBase64String(parts[0]);
-            byte[] savedHash = Convert.FromBase64String(parts[1]);
-
-            var hash = Rfc2898DeriveBytes.Pbkdf2(
-                password,
-                salt,
-                100000,
-                HashAlgorithmName.SHA256,
-                32
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtKey)
             );
 
-            return CryptographicOperations.FixedTimeEquals(hash, savedHash);
+            var credentials = new SigningCredentials(
+                key,
+                SecurityAlgorithms.HmacSha256
+            );
+
+            var token = new JwtSecurityToken(
+                issuer: _configuration["Jwt:Issuer"],
+                audience: _configuration["Jwt:Audience"],
+                claims: claims,
+                expires: DateTime.UtcNow.AddHours(8),
+                signingCredentials: credentials
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
-    }
-
-    public class RegisterRequest
-    {
-        public string FullName { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-        public string Role { get; set; } = "ChoirMember";
-    }
-
-    public class LoginRequest
-    {
-        public string Email { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
     }
 }

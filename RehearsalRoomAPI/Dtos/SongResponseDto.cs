@@ -4,14 +4,18 @@ namespace RehearsalRoomAPI.Dtos
     {
         public int Id { get; set; }
 
-        public string Title { get; set; } = string.Empty;
+        public string Title { get; set; } = "";
 
-        public string Key { get; set; } = string.Empty;
+        public string Artist { get; set; } = "";
 
-        public string Format { get; set; } = string.Empty;
+        public string Key { get; set; } = "";
 
-        public string YouTubeLink { get; set; } = string.Empty;
+        public string Tempo { get; set; } = "";
 
-        public string AudioFileName { get; set; } = string.Empty;
+        public string Category { get; set; } = "";
+
+        public string YoutubeLink { get; set; } = "";
+
+        public string Notes { get; set; } = "";
     }
 }

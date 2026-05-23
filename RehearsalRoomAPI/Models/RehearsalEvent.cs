@@ -8,6 +8,10 @@ namespace RehearsalRoomAPI.Models
 
         public DateTime EventDate { get; set; }
 
+        public string Location { get; set; } = string.Empty;
+
         public string Notes { get; set; } = string.Empty;
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

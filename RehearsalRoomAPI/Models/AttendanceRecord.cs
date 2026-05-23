@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations.Schema;
-
 namespace RehearsalRoomAPI.Models
 {
     public class AttendanceRecord
@@ -8,14 +6,12 @@ namespace RehearsalRoomAPI.Models
 
         public int RehearsalEventId { get; set; }
 
-        [ForeignKey("RehearsalEventId")]
-        public RehearsalEvent? RehearsalEvent { get; set; }
+        public string MemberName { get; set; } = string.Empty;
 
-        public int ChoirMemberId { get; set; }
+        public string Role { get; set; } = string.Empty;
 
-        [ForeignKey("ChoirMemberId")]
-        public ChoirMember? ChoirMember { get; set; }
+        public string Status { get; set; } = "Pending";
 
-        public bool Attending { get; set; }
+        public DateTime RespondedAt { get; set; } = DateTime.UtcNow;
     }
 }

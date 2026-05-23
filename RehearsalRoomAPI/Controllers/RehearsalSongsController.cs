@@ -43,7 +43,9 @@ namespace RehearsalRoomAPI.Controllers
             var rehearsalSong = await _context.RehearsalSongs.FindAsync(id);
 
             if (rehearsalSong == null)
+            {
                 return NotFound();
+            }
 
             _context.RehearsalSongs.Remove(rehearsalSong);
             await _context.SaveChangesAsync();

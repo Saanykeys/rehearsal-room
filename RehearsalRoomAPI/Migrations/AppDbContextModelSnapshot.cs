@@ -23,22 +23,27 @@ namespace RehearsalRoomAPI.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<bool>("Attending")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("ChoirMemberId")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("MemberName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("RehearsalEventId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime>("RespondedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("ChoirMemberId");
-
-                    b.HasIndex("RehearsalEventId");
-
-                    b.ToTable("AttendanceRecords");
+                    b.ToTable("AttendanceRecords", (string)null);
                 });
 
             modelBuilder.Entity("RehearsalRoomAPI.Models.ChoirMember", b =>
@@ -61,7 +66,7 @@ namespace RehearsalRoomAPI.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("ChoirMembers");
+                    b.ToTable("ChoirMembers", (string)null);
                 });
 
             modelBuilder.Entity("RehearsalRoomAPI.Models.RehearsalEvent", b =>
@@ -70,7 +75,14 @@ namespace RehearsalRoomAPI.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("EventDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Notes")
@@ -83,7 +95,7 @@ namespace RehearsalRoomAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("RehearsalEvents");
+                    b.ToTable("RehearsalEvents", (string)null);
                 });
 
             modelBuilder.Entity("RehearsalRoomAPI.Models.RehearsalSong", b =>
@@ -107,38 +119,7 @@ namespace RehearsalRoomAPI.Migrations
 
                     b.HasIndex("SongId");
 
-                    b.ToTable("RehearsalSongs");
-                });
-
-            modelBuilder.Entity("RehearsalRoomAPI.Models.Song", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("AudioFileName")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Format")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Key")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("YouTubeLink")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Songs");
+                    b.ToTable("RehearsalSongs", (string)null);
                 });
 
             modelBuilder.Entity("RehearsalRoomAPI.Models.SongSuggestion", b =>
@@ -182,7 +163,7 @@ namespace RehearsalRoomAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("SongSuggestions");
+                    b.ToTable("SongSuggestions", (string)null);
                 });
 
             modelBuilder.Entity("RehearsalRoomAPI.Models.User", b =>
@@ -212,26 +193,49 @@ namespace RehearsalRoomAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
-            modelBuilder.Entity("RehearsalRoomAPI.Models.AttendanceRecord", b =>
+            modelBuilder.Entity("Song", b =>
                 {
-                    b.HasOne("RehearsalRoomAPI.Models.ChoirMember", "ChoirMember")
-                        .WithMany()
-                        .HasForeignKey("ChoirMemberId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
 
-                    b.HasOne("RehearsalRoomAPI.Models.RehearsalEvent", "RehearsalEvent")
-                        .WithMany()
-                        .HasForeignKey("RehearsalEventId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.Property<string>("Artist")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
-                    b.Navigation("ChoirMember");
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
-                    b.Navigation("RehearsalEvent");
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Tempo")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("YoutubeLink")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Songs", (string)null);
                 });
 
             modelBuilder.Entity("RehearsalRoomAPI.Models.ChoirMember", b =>
@@ -251,7 +255,7 @@ namespace RehearsalRoomAPI.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("RehearsalRoomAPI.Models.Song", "Song")
+                    b.HasOne("Song", "Song")
                         .WithMany()
                         .HasForeignKey("SongId")
                         .OnDelete(DeleteBehavior.Cascade)

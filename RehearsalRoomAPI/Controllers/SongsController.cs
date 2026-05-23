@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RehearsalRoomAPI.Data;
@@ -8,6 +9,7 @@ namespace RehearsalRoomAPI.Controllers
 {
     [ApiController]
     [Route("[controller]")]
+    //[Authorize]
     public class SongsController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -37,22 +39,22 @@ namespace RehearsalRoomAPI.Controllers
                 .Where(s =>
                     s.Title.ToLower().Contains(query.ToLower()) ||
                     s.Key.ToLower().Contains(query.ToLower()) ||
-                    s.Format.ToLower().Contains(query.ToLower()))
+                    s.Category.ToLower().Contains(query.ToLower()))
                 .ToListAsync();
 
             return songs.Select(ToSongResponseDto);
         }
 
-       
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<SongResponseDto>> Create(CreateSongDto dto)
         {
             var song = new Song
             {
                 Title = dto.Title,
                 Key = dto.Key,
-                Format = dto.Format,
-                YouTubeLink = dto.YouTubeLink
+                Category = dto.Category,
+                YoutubeLink = dto.YoutubeLink
             };
 
             _context.Songs.Add(song);
@@ -61,8 +63,8 @@ namespace RehearsalRoomAPI.Controllers
             return Ok(ToSongResponseDto(song));
         }
 
-
         [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<SongResponseDto>> Update(int id, UpdateSongDto dto)
         {
             var song = await _context.Songs.FindAsync(id);
@@ -74,8 +76,8 @@ namespace RehearsalRoomAPI.Controllers
 
             song.Title = dto.Title;
             song.Key = dto.Key;
-            song.Format = dto.Format;
-            song.YouTubeLink = dto.YouTubeLink;
+            song.Category = dto.Category;
+            song.YoutubeLink = dto.YoutubeLink;
 
             await _context.SaveChangesAsync();
 
@@ -83,6 +85,7 @@ namespace RehearsalRoomAPI.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
             var song = await _context.Songs.FindAsync(id);
@@ -105,9 +108,8 @@ namespace RehearsalRoomAPI.Controllers
                 Id = song.Id,
                 Title = song.Title,
                 Key = song.Key,
-                Format = song.Format,
-                YouTubeLink = song.YouTubeLink,
-AudioFileName = song.AudioFileName
+                Category = song.Category,
+                YoutubeLink = song.YoutubeLink
             };
         }
     }

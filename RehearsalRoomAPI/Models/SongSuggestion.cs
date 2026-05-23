@@ -7,6 +7,7 @@ namespace RehearsalRoomAPI.Models
         public string Title { get; set; } = string.Empty;
         public string Artist { get; set; } = string.Empty;
         public string YouTubeLink { get; set; } = string.Empty;
+        
         public string Reason { get; set; } = string.Empty;
         public string SuggestedBy { get; set; } = string.Empty;
 

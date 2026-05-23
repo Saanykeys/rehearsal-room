@@ -25,13 +25,34 @@ namespace RehearsalRoomAPI.Controllers
         }
 
         [HttpPost]
-public async Task<ActionResult<RehearsalEvent>> CreateEvent(RehearsalEvent rehearsalEvent)
-{
-    _context.RehearsalEvents.Add(rehearsalEvent);
-    await _context.SaveChangesAsync();
+        public async Task<ActionResult<RehearsalEvent>> CreateEvent(RehearsalEvent rehearsalEvent)
+        {
+            _context.RehearsalEvents.Add(rehearsalEvent);
 
-    return Ok(rehearsalEvent);
-}
+            await _context.SaveChangesAsync();
+
+            return Ok(rehearsalEvent);
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateEvent(int id, RehearsalEvent updatedEvent)
+        {
+            var rehearsalEvent = await _context.RehearsalEvents.FindAsync(id);
+
+            if (rehearsalEvent == null)
+            {
+                return NotFound();
+            }
+
+            rehearsalEvent.Title = updatedEvent.Title;
+            rehearsalEvent.EventDate = updatedEvent.EventDate;
+            rehearsalEvent.Location = updatedEvent.Location;
+            rehearsalEvent.Notes = updatedEvent.Notes;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(rehearsalEvent);
+        }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteEvent(int id)
@@ -44,6 +65,7 @@ public async Task<ActionResult<RehearsalEvent>> CreateEvent(RehearsalEvent rehea
             }
 
             _context.RehearsalEvents.Remove(rehearsalEvent);
+
             await _context.SaveChangesAsync();
 
             return NoContent();

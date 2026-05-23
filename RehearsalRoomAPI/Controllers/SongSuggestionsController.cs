@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RehearsalRoomAPI.Data;
@@ -7,6 +8,7 @@ namespace RehearsalRoomAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    //[Authorize]
     public class SongSuggestionsController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -16,7 +18,6 @@ namespace RehearsalRoomAPI.Controllers
             _context = context;
         }
 
-        // GET: api/songsuggestions
         [HttpGet]
         public async Task<ActionResult<IEnumerable<SongSuggestion>>> GetSuggestions()
         {
@@ -25,7 +26,6 @@ namespace RehearsalRoomAPI.Controllers
                 .ToListAsync();
         }
 
-        // POST: api/songsuggestions
         [HttpPost]
         public async Task<ActionResult<SongSuggestion>> CreateSuggestion(SongSuggestion suggestion)
         {
@@ -33,14 +33,13 @@ namespace RehearsalRoomAPI.Controllers
             suggestion.CreatedDate = DateTime.UtcNow;
 
             _context.SongSuggestions.Add(suggestion);
-
             await _context.SaveChangesAsync();
 
             return Ok(suggestion);
         }
 
-        // PUT: api/songsuggestions/5/approve
         [HttpPut("{id}/approve")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> ApproveSuggestion(int id)
         {
             var suggestion = await _context.SongSuggestions.FindAsync(id);
@@ -51,14 +50,13 @@ namespace RehearsalRoomAPI.Controllers
             }
 
             suggestion.Status = "Approved";
-
             await _context.SaveChangesAsync();
 
             return Ok(suggestion);
         }
 
-        // PUT: api/songsuggestions/5/reject
         [HttpPut("{id}/reject")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> RejectSuggestion(int id)
         {
             var suggestion = await _context.SongSuggestions.FindAsync(id);
@@ -69,10 +67,39 @@ namespace RehearsalRoomAPI.Controllers
             }
 
             suggestion.Status = "Rejected";
-
             await _context.SaveChangesAsync();
 
             return Ok(suggestion);
+        }
+
+        [HttpPost("{id}/add-to-library")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> AddSuggestionToLibrary(int id)
+        {
+            var suggestion = await _context.SongSuggestions.FindAsync(id);
+
+            if (suggestion == null)
+            {
+                return NotFound();
+            }
+
+            if (suggestion.Status != "Approved")
+            {
+                return BadRequest("Only approved suggestions can be added to the song library.");
+            }
+
+            var song = new Song
+            {
+                Title = suggestion.Title,
+                YoutubeLink = suggestion.YouTubeLink,
+                Key = "",
+                Category = "Worship"
+            };
+
+            _context.Songs.Add(song);
+            await _context.SaveChangesAsync();
+
+            return Ok(song);
         }
     }
 }

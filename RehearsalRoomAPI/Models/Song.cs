@@ -1,22 +1,20 @@
-using System.ComponentModel.DataAnnotations;
-
-namespace RehearsalRoomAPI.Models
+public class Song
 {
-    public class Song
-    {
-        public int Id { get; set; }
+    public int Id { get; set; }
 
-        [Required]
-        public string Title { get; set; } = string.Empty;
+    public string Title { get; set; } = "";
 
-        [Required]
-        public string Key { get; set; } = string.Empty;
+    public string Artist { get; set; } = "";
 
-        [Required]
-        public string Format { get; set; } = string.Empty;
+    public string Key { get; set; } = "";
 
-        public string YouTubeLink { get; set; } = string.Empty;
+    public string Tempo { get; set; } = "";
 
-        public string AudioFileName { get; set; } = string.Empty;
-    }
+    public string Category { get; set; } = "";
+
+    public string YoutubeLink { get; set; } = "";
+
+    public string Notes { get; set; } = "";
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

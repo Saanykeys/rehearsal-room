@@ -1,1594 +1,376 @@
-import { useEffect, useState } from "react";
-import { QRCodeSVG } from "qrcode.react";
+import { useState } from "react";
 import rehearsalLogo from "./assets/rehearsalroom-logo.png";
-import LandingPage from "./pages/LandingPage";
 import AdminDashboard from "./components/AdminDashboard";
-import MemberDashboard from "./components/MemberDashboard";
 
-const API_BASE = "http://localhost:5281";
+const API_BASE = import.meta.env.VITE_API_BASE;
 
-function App() {
-  //return <LandingPage />; 
-  
-  const [songs, setSongs] = useState([]);
-  const [choirMembers, setChoirMembers] = useState([]);
-  const [rehearsalEvents, setRehearsalEvents] = useState([]);
-  const [rehearsalSongs, setRehearsalSongs] = useState({});
-const [selectedSongByEvent, setSelectedSongByEvent] = useState({});
-  const [attendanceRecords, setAttendanceRecords] = useState([]);
-  const [selectedEventId, setSelectedEventId] = useState(null);
-const [rehearsalMode, setRehearsalMode] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortBy, setSortBy] = useState("title");
-
-  const [showAddMember, setShowAddMember] = useState(false);
-  const [newMemberName, setNewMemberName] = useState("");
-
-  const [showAddEvent, setShowAddEvent] = useState(false);
-  const [newEvent, setNewEvent] = useState({
-    title: "",
-    eventDate: "",
-    notes: "",
-
-  });
-
-  const [songSuggestions, setSongSuggestions] = useState([]);
-const [suggestionTitle, setSuggestionTitle] = useState("");
-const [suggestionArtist, setSuggestionArtist] = useState("");
-const [suggestionYouTubeLink, setSuggestionYouTubeLink] = useState("");
-const [suggestionReason, setSuggestionReason] = useState("");
-
-  const [showAddSong, setShowAddSong] = useState(false);
-  const [newSong, setNewSong] = useState({
-    title: "",
-    key: "",
-    format: "",
-    youTubeLink: "",
-    audioFile: null,
-  });
-
-  const [editingSong, setEditingSong] = useState(null);
-  const [editSongForm, setEditSongForm] = useState({
-    title: "",
-    key: "",
-    format: "",
-    youTubeLink: "",
-  });
+export default function App() {
+  const [showAuth, setShowAuth] = useState(false);
 
   const [currentUser, setCurrentUser] = useState(() => {
     const savedUser = localStorage.getItem("rehearsalRoomUser");
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
-  const [showRegisterPage, setShowRegisterPage] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("register") === "true";
+  const [token, setToken] = useState(() => {
+    return localStorage.getItem("rehearsalRoomToken");
   });
 
-  const inviteLink = `${window.location.origin}?register=true`;
+  const [authMode, setAuthMode] = useState("login");
+  const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
 
-  const [loginForm, setLoginForm] = useState({
-    email: "",
-    password: "",
-  });
-
-  const [loginError, setLoginError] = useState("");
-
-  const [registerForm, setRegisterForm] = useState({
+  const [authForm, setAuthForm] = useState({
     fullName: "",
-    email: "",
-    password: "",
+    email: "admin@rehearsalroom.com",
+    password: "Password123!",
+    role: "Admin",
   });
 
-  const [registerError, setRegisterError] = useState("");
-  const [registerSuccess, setRegisterSuccess] = useState("");
+  const isLoggedIn = currentUser && token;
 
-  const isAdmin = currentUser?.role === "Admin";
-return <AdminDashboard />;
+  const handleAuthSubmit = async (event) => {
+    event.preventDefault();
+    setAuthError("");
+    setAuthLoading(true);
 
-  const canUpdateMemberAttendance = (member) => {
-    if (isAdmin) return true;
-    return member.userId === currentUser?.id;
-  };
-const submitSongSuggestion = async () => {
-  try {
-    const response = await fetch(
-      "http://localhost:5281/api/SongSuggestions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: suggestionTitle,
-          artist: suggestionArtist,
-          youtubeLink: suggestionYouTubeLink,
-          reason: suggestionReason,
-          suggestedBy: currentUser?.fullName || "Anonymous",
-        }),
-      }
-    );
+    const endpoint = authMode === "login" ? "login" : "register";
 
-    const data = await response.json();
-
-    setSongSuggestions((prev) => [...prev, data]);
-
-    setSuggestionTitle("");
-    setSuggestionArtist("");
-    setSuggestionYouTubeLink("");
-    setSuggestionReason("");
-
-    alert("Song suggestion submitted!");
-  } catch (error) {
-    console.error(error);
-    alert("Failed to submit suggestion");
-  }
-};
-
-const filteredSongs = songs
-
-
-    .filter((song) => {
-      const search = searchTerm.toLowerCase();
-
-      return (
-        song.title?.toLowerCase().includes(search) ||
-        song.key?.toLowerCase().includes(search) ||
-        song.format?.toLowerCase().includes(search)
-      );
-    })
-    .sort((a, b) => {
-      const aValue = a[sortBy]?.toLowerCase() || "";
-      const bValue = b[sortBy]?.toLowerCase() || "";
-
-      return aValue.localeCompare(bValue);
-    });
-
-  const selectedEventAttendance = choirMembers.map((member) => {
-    const record = attendanceRecords.find(
-      (r) =>
-        r.choirMemberId === member.id &&
-        r.rehearsalEventId === selectedEventId
-    );
-
-    return {
-      member,
-      attending: record?.attending,
-    };
-  });
-
-  const totalMembers = choirMembers.length;
-
-  const attendingCount = selectedEventAttendance.filter(
-    (item) => item.attending === true
-  ).length;
-
-  const notAttendingCount = selectedEventAttendance.filter(
-    (item) => item.attending === false
-  ).length;
-
-  const noResponseCount = selectedEventAttendance.filter(
-    (item) => item.attending === undefined
-  ).length;
-
-  const attendancePercentage =
-    totalMembers === 0
-      ? 0
-      : Math.round((attendingCount / totalMembers) * 100);
-
-  useEffect(() => {
-    if (!currentUser) return;
-
-    fetch(`${API_BASE}/songs`)
-      .then((res) => res.json())
-      .then((data) => setSongs(data))
-      .catch((err) => console.error(err));
-
-    fetch(`${API_BASE}/choirmembers`)
-      .then((res) => res.json())
-      .then((data) => setChoirMembers(data))
-      .catch((err) => console.error(err));
-fetch(`${API_BASE}/api/RehearsalEvents`)
-  .then((res) => res.json())
-  .then((data) => {
-    setRehearsalEvents(data);
-
-    data.forEach((event) => {
-      fetchRehearsalSongs(event.id);
-    });
-  })
-  .catch((err) => console.error(err));
-
-    fetch(`${API_BASE}/api/AttendanceRecords`)
-      .then((res) => res.json())
-      .then((data) => setAttendanceRecords(data))
-      .catch((err) => console.error(err));
-
-
-fetch(`${API_BASE}/api/SongSuggestions`)
-  .then((res) => res.json())
-  .then((data) => setSongSuggestions(data))
-  .catch((err) => console.error(err));
-
-
-
-
-
-
-
-  }, [currentUser]);
-
-  const login = async (e) => {
-    e.preventDefault();
-    setLoginError("");
+    const payload =
+      authMode === "login"
+        ? {
+            email: authForm.email,
+            password: authForm.password,
+          }
+        : {
+            fullName: authForm.fullName,
+            email: authForm.email,
+            password: authForm.password,
+            role: authForm.role,
+          };
 
     try {
-      const response = await fetch(`${API_BASE}/api/Auth/login`, {
+      const response = await fetch(`${API_BASE}/api/Auth/${endpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(loginForm),
+        body: JSON.stringify(payload),
       });
-
-      if (!response.ok) {
-        setLoginError("Invalid email or password.");
-        return;
-      }
 
       const data = await response.json();
 
-      localStorage.setItem("rehearsalRoomUser", JSON.stringify(data));
-      setCurrentUser(data);
-      setShowRegisterPage(false);
-      window.history.replaceState({}, "", window.location.origin);
-    } catch (error) {
-      console.error(error);
-      setLoginError("Something went wrong. Please try again.");
-    }
-  };
-
-  const registerMember = async (e) => {
-    e.preventDefault();
-    setRegisterError("");
-    setRegisterSuccess("");
-
-    if (
-      registerForm.fullName.trim() === "" ||
-      registerForm.email.trim() === "" ||
-      registerForm.password.trim() === ""
-    ) {
-      setRegisterError("Please fill out all fields.");
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE}/api/Auth/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fullName: registerForm.fullName,
-          email: registerForm.email,
-          password: registerForm.password,
-          role: "ChoirMember",
-        }),
-      });
-
       if (!response.ok) {
-        setRegisterError("Could not create account. Email may already exist.");
+        setAuthError(
+          typeof data === "string"
+            ? data
+            : data.message || "Authentication failed."
+        );
         return;
       }
 
-      setRegisterSuccess("Account created successfully. You can now log in.");
-      setRegisterForm({
-        fullName: "",
-        email: "",
-        password: "",
-      });
+      const userToken = data.token || data.Token || "";
+
+      const user = {
+        id: data.id,
+        fullName: data.fullName,
+        email: data.email,
+        role: data.role,
+      };
+
+      localStorage.setItem("rehearsalRoomToken", userToken);
+      localStorage.setItem("rehearsalRoomUser", JSON.stringify(user));
+
+      setToken(userToken);
+      setCurrentUser(user);
     } catch (error) {
       console.error(error);
-      setRegisterError("Something went wrong creating your account.");
+      setAuthError("Could not connect to the authentication server.");
+    } finally {
+      setAuthLoading(false);
     }
   };
 
   const logout = () => {
+    localStorage.removeItem("rehearsalRoomToken");
     localStorage.removeItem("rehearsalRoomUser");
+    setToken(null);
     setCurrentUser(null);
-    setSongs([]);
-    setChoirMembers([]);
-    setRehearsalEvents([]);
-    setAttendanceRecords([]);
-    setSearchTerm("");
-    setSortBy("title");
-    setSelectedEventId(null);
+    setAuthMode("login");
+    setShowAuth(false);
   };
 
-  const copyInviteLink = async () => {
-    try {
-      await navigator.clipboard.writeText(inviteLink);
-      alert("Invite link copied.");
-    } catch {
-      alert(inviteLink);
-    }
-  };
+  if (!isLoggedIn && !showAuth) {
+    return <LandingPage onGetStarted={() => setShowAuth(true)} />;
+  }
 
-  const addSong = (e) => {
-    e.preventDefault();
+  if (!isLoggedIn && showAuth) {
+    return (
+      <AuthScreen
+        authMode={authMode}
+        setAuthMode={setAuthMode}
+        authForm={authForm}
+        setAuthForm={setAuthForm}
+        authError={authError}
+        authLoading={authLoading}
+        handleAuthSubmit={handleAuthSubmit}
+        onBack={() => setShowAuth(false)}
+      />
+    );
+  }
+const getSongsForRehearsal = (rehearsal) => {
+  if (!rehearsal?.songIds || rehearsal.songIds.length === 0) {
+    return [];
+  }
 
-    if (
-      newSong.title.trim() === "" ||
-      newSong.key.trim() === "" ||
-      newSong.format.trim() === ""
-    ) {
-      return;
-    }
+  return songs.filter((song) => rehearsal.songIds.includes(song.id));
+};
+  return (
+    <div className="min-h-screen bg-slate-950">
+      <div className="fixed right-5 top-5 z-[60] flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/90 px-4 py-3 text-white shadow-xl backdrop-blur">
+        <div className="hidden text-right sm:block">
+          <p className="text-sm font-black">{currentUser.fullName}</p>
+          <p className="text-xs text-slate-400">{currentUser.role}</p>
+        </div>
 
- const formData = new FormData();
+        <button
+          onClick={logout}
+          className="rounded-xl bg-red-500/20 px-4 py-2 text-sm font-black text-red-200 hover:bg-red-500/30"
+        >
+          Logout
+        </button>
+      </div>
 
-formData.append("title", newSong.title);
-formData.append("key", newSong.key);
-formData.append("format", newSong.format);
-formData.append("youTubeLink", newSong.youTubeLink);
-
-if (newSong.audioFile) {
-  formData.append("audioFile", newSong.audioFile);
+      <AdminDashboard currentUser={currentUser} token={token} onLogout={logout} />
+    </div>
+  );
 }
 
-fetch(`${API_BASE}/songs`, {
-  method: "POST",
-  body: formData,
-})
-      .then((res) => res.json())
-      .then((createdSong) => {
-        setSongs([...songs, createdSong]);
+function LandingPage({ onGetStarted }) {
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 px-6 py-8 text-white">
+      <section className="mx-auto flex min-h-[85vh] max-w-6xl items-center">
+       <div className="grid w-full gap-10 overflow-hidden lg:grid-cols-[1fr_0.8fr] lg:items-center">
+          <div>
+            <div className="flex items-center gap-4">
+              <img
+                src={rehearsalLogo}
+                alt="Rehearsal Room Logo"
+                className="h-16 w-16 rounded-2xl object-cover shadow-lg shadow-amber-900/30"
+              />
 
-        setNewSong({
-          title: "",
-          key: "",
-          format: "",
-          youTubeLink: "",
-        });
+              <p className="text-sm font-black uppercase tracking-[0.35em] text-amber-300">
+                Rehearsal Room
+              </p>
+            </div>
 
-        setShowAddSong(false);
-      })
-      .catch((err) => console.error(err));
-  };
+           <h1 className="mt-8 text-4xl font-black leading-tight sm:text-5xl md:text-6xl lg:text-7xl">
+              Run rehearsals with clarity, confidence, and order.
+            </h1>
 
-  const startEditSong = (song) => {
-    setEditingSong(song);
+          <p className="mt-6 max-w-2xl text-base text-slate-300 sm:text-lg">
+              Manage songs, members, attendance, rehearsals, and worship team
+              planning from one modern dashboard.
+            </p>
 
-    setEditSongForm({
-      title: song.title,
-      key: song.key,
-      format: song.format,
-      youTubeLink: song.youTubeLink || "",
-    });
-  };
+            <button
+              onClick={onGetStarted}className="mt-8 rounded-2xl bg-amber-400 px-6 py-3 text-basefont-black text-slate-950 shadow-xl transition hover:scale-105"
+            >
+              Get Started
+            </button>
+          </div>
+ 
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 md:p-6shadow-2xl backdrop-blur">
+            <h2 className="text-3xl font-black">Built for worship teams</h2>
 
-  const cancelEditSong = () => {
-    setEditingSong(null);
+            <div className="mt-6 grid gap-4">
+              <FeatureCard title="Song Library" text="Store songs, keys, notes, and videos." />
+              <FeatureCard title="Members" text="Invite team members and manage roles." />
+              <FeatureCard title="Attendance" text="Track who is confirmed for rehearsal." />
+              <FeatureCard title="Dashboard" text="Give leaders one clean place to manage everything." />
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
 
-    setEditSongForm({
-      title: "",
-      key: "",
-      format: "",
-      youTubeLink: "",
-    });
-  };
+function AuthScreen({
+  authMode,
+  setAuthMode,
+  authForm,
+  setAuthForm,
+  authError,
+  authLoading,
+  handleAuthSubmit,
+  onBack,
+}) {
+  const isLogin = authMode === "login";
 
-  const updateSong = (e) => {
-    e.preventDefault();
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 px-5 text-white">
+      <section className="grid w-full max-w-6xl gap-6 lg:grid-cols-[1fr_0.85fr] lg:items-center">
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-7 shadow-2xl backdrop-blur">
+          <button
+            type="button"
+            onClick={onBack}
+            className="mb-6 rounded-xl bg-white/10 px-4 py-2 text-sm font-bold text-slate-200 hover:bg-white/15"
+          >
+            ← Back to Home
+          </button>
 
-    fetch(`${API_BASE}/songs/${editingSong.id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(editSongForm),
-    })
-      .then((res) => res.json())
-      .then((updatedSong) => {
-        setSongs((prevSongs) =>
-          prevSongs.map((song) =>
-            song.id === updatedSong.id ? updatedSong : song
-          )
-        );
+          <div className="flex items-center gap-4">
+            <img
+              src={rehearsalLogo}
+              alt="Rehearsal Room Logo"
+              className="h-16 w-16 rounded-2xl object-cover shadow-lg shadow-amber-900/30"
+            />
 
-        cancelEditSong();
-      })
-      .catch((err) => console.error(err));
-  };
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.35em] text-amber-300">
+                Rehearsal Room
+              </p>
+              <h1 className="mt-2 text-4xl font-black">
+                Worship team management made simple.
+              </h1>
+            </div>
+          </div>
 
-  const deleteSong = (id) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this song?"
-    );
-
-    if (!confirmed) return;
-
-    fetch(`${API_BASE}/songs/${id}`, {
-      method: "DELETE",
-    })
-      .then(() => {
-        setSongs((prevSongs) => prevSongs.filter((song) => song.id !== id));
-      })
-      .catch((err) => console.error(err));
-  };
-
-  const addRehearsalEvent = (e) => {
-    e.preventDefault();
-
-    if (newEvent.title.trim() === "" || newEvent.eventDate.trim() === "") {
-      return;
-    }
-
-    fetch(`${API_BASE}/api/RehearsalEvents`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(newEvent),
-    })
-      .then((res) => res.json())
-      .then((createdEvent) => {
-        setRehearsalEvents((prev) => [...prev, createdEvent]);
-
-        setNewEvent({
-          title: "",
-          eventDate: "",
-          notes: "",
-        });
-
-        setShowAddEvent(false);
-      })
-      .catch((err) => console.error(err));
-  };
-
-  const deleteEvent = (id) => {
-    const confirmed = window.confirm("Delete this rehearsal event?");
-
-    if (!confirmed) return;
-
-    fetch(`${API_BASE}/api/RehearsalEvents/${id}`, {
-      method: "DELETE",
-    })
-      .then(() => {
-        setRehearsalEvents((prev) =>
-          prev.filter((event) => event.id !== id)
-        );
-      })
-      .catch((err) => console.error(err));
-  };
-
-  const addMember = (e) => {
-    e.preventDefault();
-
-    if (newMemberName.trim() === "") return;
-
-    fetch(`${API_BASE}/choirmembers`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: newMemberName,
-        attending: false,
-      }),
-    })
-      .then((res) => res.json())
-      .then((newMember) => {
-        setChoirMembers([...choirMembers, newMember]);
-        setNewMemberName("");
-        setShowAddMember(false);
-      })
-      .catch((err) => console.error(err));
-  };
-
-  const updateAttendance = (member, status) => {
-    if (!selectedEventId) {
-      alert("Please select a rehearsal event first.");
-      return;
-    }
-
-    if (!canUpdateMemberAttendance(member)) {
-      alert("You can only update your own attendance.");
-      return;
-    }
-
-    fetch(`${API_BASE}/api/AttendanceRecords`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        choirMemberId: member.id,
-        rehearsalEventId: selectedEventId,
-        attending: status,
-      }),
-    })
-      .then((res) => res.json())
-      .then((savedRecord) => {
-        setAttendanceRecords((prev) => {
-          const existing = prev.find(
-            (record) =>
-              record.choirMemberId === savedRecord.choirMemberId &&
-              record.rehearsalEventId === savedRecord.rehearsalEventId
-          );
-
-          if (existing) {
-            return prev.map((record) =>
-              record.id === savedRecord.id ? savedRecord : record
-            );
-          }
-
-          return [...prev, savedRecord];
-        });
-      })
-      .catch((err) => console.error(err));
-  };
-
-  const getAttendanceStatus = (memberId) => {
-    if (!selectedEventId) return null;
-
-    const record = attendanceRecords.find(
-      (r) =>
-        r.choirMemberId === memberId &&
-        r.rehearsalEventId === selectedEventId
-    );
-
-    return record?.attending ?? null;
-  };
-
-  const deleteMember = (id) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this choir member?"
-    );
-
-    if (!confirmed) return;
-
-    fetch(`${API_BASE}/choirmembers/${id}`, {
-      method: "DELETE",
-    })
-      .then(() => {
-        setChoirMembers((prevMembers) =>
-          prevMembers.filter((member) => member.id !== id)
-        );
-      })
-      .catch((err) => console.error(err));
-  };
-
-
-const fetchRehearsalSongs = (rehearsalEventId) => {
-  fetch(`${API_BASE}/api/RehearsalSongs/${rehearsalEventId}`)
-    .then((res) => res.json())
-    .then((data) => {
-      setRehearsalSongs((prev) => ({
-        ...prev,
-        [rehearsalEventId]: data,
-      }));
-    })
-    .catch((err) => console.error(err));
-};
-
-const assignSongToRehearsal = (rehearsalEventId) => {
-  const songId = selectedSongByEvent[rehearsalEventId];
-
-  if (!songId) return;
-
-  fetch(`${API_BASE}/api/RehearsalSongs`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      rehearsalEventId,
-      songId: Number(songId),
-    }),
-  })
-    .then((res) => res.json())
-    .then(() => {
-      fetchRehearsalSongs(rehearsalEventId);
-
-      setSelectedSongByEvent((prev) => ({
-        ...prev,
-        [rehearsalEventId]: "",
-      }));
-    })
-    .catch((err) => console.error(err));
-};
-
-
-
-
-
-
-  if (showRegisterPage && !currentUser) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 px-6 text-white">
-        <form
-          onSubmit={registerMember}
-          className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg backdrop-blur-md"
-        >
-          <div className="flex items-center gap-3">
-  <img
-    src={rehearsalLogo}
-    alt="Rehearsal Room Logo"
-    className="h-12 w-12 rounded-2xl object-cover shadow-lg shadow-amber-900/30"
-  />
-
-  <div>
-    <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-300">
-      Rehearsal Room
-    </p>
-
-    <h1 className="mt-1 text-xl font-bold">Song Library</h1>
-  </div>
-</div>
-
-          <p className="mt-3 text-slate-300">
-            Register as a choir member to access songs and attendance.
+          <p className="mt-6 max-w-2xl text-lg text-slate-300">
+            Manage your song library, rehearsals, setlists, attendance, members,
+            and role-based access from one modern dashboard.
           </p>
 
-          {registerError && (
-            <div className="mt-5 rounded-2xl bg-red-500/20 p-4 text-red-200">
-              {registerError}
-            </div>
-          )}
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            <FeatureCard title="Songs" text="Organize keys, notes, videos, and setlists." />
+            <FeatureCard title="Rehearsals" text="Plan dates, locations, songs, and notes." />
+            <FeatureCard title="Attendance" text="Track confirmations with live status." />
+          </div>
+        </div>
 
-          {registerSuccess && (
-            <div className="mt-5 rounded-2xl bg-green-500/20 p-4 text-green-200">
-              {registerSuccess}
+        <form
+          onSubmit={handleAuthSubmit}
+          className="rounded-3xl border border-white/10 bg-slate-950/80 p-6 shadow-2xl backdrop-blur"
+        >
+          <p className="text-xs font-black uppercase tracking-[0.3em] text-amber-300">
+            {isLogin ? "Secure Login" : "Create Account"}
+          </p>
+
+          <h2 className="mt-3 text-3xl font-black">
+            {isLogin ? "Welcome Back" : "Register User"}
+          </h2>
+
+          <p className="mt-2 text-sm text-slate-400">
+            {isLogin
+              ? "Sign in with your Rehearsal Room account."
+              : "Create an account with a role."}
+          </p>
+
+          {authError && (
+            <div className="mt-5 rounded-2xl bg-red-500/20 px-4 py-3 text-sm font-bold text-red-200">
+              {authError}
             </div>
           )}
 
           <div className="mt-6 space-y-4">
-            <input
-              type="text"
-              placeholder="Full name"
-              value={registerForm.fullName}
-              onChange={(e) =>
-                setRegisterForm({
-                  ...registerForm,
-                  fullName: e.target.value,
-                })
-              }
-              className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-5 py-4 text-white outline-none placeholder:text-slate-500 focus:border-amber-300"
-            />
+            {!isLogin && (
+              <AuthInput
+                label="Full Name"
+                value={authForm.fullName}
+                onChange={(value) =>
+                  setAuthForm((prev) => ({ ...prev, fullName: value }))
+                }
+                placeholder="Rahsaan Hall"
+              />
+            )}
 
-            <input
+            <AuthInput
+              label="Email"
               type="email"
-              placeholder="Email"
-              value={registerForm.email}
-              onChange={(e) =>
-                setRegisterForm({
-                  ...registerForm,
-                  email: e.target.value,
-                })
+              value={authForm.email}
+              onChange={(value) =>
+                setAuthForm((prev) => ({ ...prev, email: value }))
               }
-              className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-5 py-4 text-white outline-none placeholder:text-slate-500 focus:border-amber-300"
+              placeholder="admin@rehearsalroom.com"
             />
 
-            <input
+            <AuthInput
+              label="Password"
               type="password"
-              placeholder="Password"
-              value={registerForm.password}
-              onChange={(e) =>
-                setRegisterForm({
-                  ...registerForm,
-                  password: e.target.value,
-                })
+              value={authForm.password}
+              onChange={(value) =>
+                setAuthForm((prev) => ({ ...prev, password: value }))
               }
-              className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-5 py-4 text-white outline-none placeholder:text-slate-500 focus:border-amber-300"
+              placeholder="Password123!"
             />
+
+            {!isLogin && (
+              <label>
+                <span className="text-sm font-bold text-slate-200">Role</span>
+                <select
+                  value={authForm.role}
+                  onChange={(event) =>
+                    setAuthForm((prev) => ({
+                      ...prev,
+                      role: event.target.value,
+                    }))
+                  }
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none focus:border-amber-400"
+                >
+                  <option>Admin</option>
+                  <option>Musician</option>
+                  <option>Choir Member</option>
+                </select>
+              </label>
+            )}
 
             <button
               type="submit"
-              className="w-full rounded-2xl bg-amber-400 px-5 py-4 font-semibold text-slate-950 hover:bg-amber-300"
+              disabled={authLoading}
+              className="w-full rounded-2xl bg-amber-400 px-5 py-3 font-black text-slate-950 transition-all hover:scale-[1.02] disabled:opacity-60"
             >
-              Create Choir Member Account
+              {authLoading ? "Please wait..." : isLogin ? "Login" : "Register"}
             </button>
 
             <button
               type="button"
               onClick={() => {
-                setShowRegisterPage(false);
-                window.history.replaceState({}, "", window.location.origin);
+                setAuthMode(isLogin ? "register" : "login");
               }}
-              className="w-full rounded-2xl border border-white/10 px-5 py-4 font-semibold text-slate-200 hover:bg-white/10"
+              className="w-full rounded-2xl bg-white/10 px-5 py-3 font-bold text-slate-200 hover:bg-white/15"
             >
-              Back to Login
+              {isLogin
+                ? "Need an account? Register"
+                : "Already have an account? Login"}
             </button>
           </div>
         </form>
-      </main>
-    );
-  }
-
-  if (!currentUser) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 px-6 text-white">
-        <form
-          onSubmit={login}
-          className="w-full max-w-md rounded-2xl border border-white/10 bg-white/10 p-5 shadow-1g backdrop-blur"
-        >
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-300">
-            Rehearsal Room
-          </p>
-
-          <h1 className="mt-4 text-2xl font-bold">Login</h1>
-
-          <p className="mt-3 text-slate-300">
-            Sign in to view songs and rehearsal attendance.
-          </p>
-
-          {loginError && (
-            <div className="mt-5 rounded-2xl bg-red-500/20 p-4 text-red-200">
-              {loginError}
-            </div>
-          )}
-
-          <div className="mt-6 space-y-4">
-            <input
-              type="email"
-              placeholder="Email"
-              value={loginForm.email}
-              onChange={(e) =>
-                setLoginForm({
-                  ...loginForm,
-                  email: e.target.value,
-                })
-              }
-              className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-5 py-4 text-white outline-none placeholder:text-slate-500 focus:border-amber-300"
-            />
-
-            <input
-              type="password"
-              placeholder="Password"
-              value={loginForm.password}
-              onChange={(e) =>
-                setLoginForm({
-                  ...loginForm,
-                  password: e.target.value,
-                })
-              }
-              className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-5 py-4 text-white outline-none placeholder:text-slate-500 focus:border-amber-300"
-            />
-
-            <button
-              type="submit"
-              className="w-full rounded-2xl bg-amber-400 px-5 py-4 font-semibold text-slate-950 hover:bg-amber-300"
-            >
-              Login
-            </button>
-          </div>
-        </form>
-      </main>
-    );
-  }
-
-  return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 text-white">
-      <section className="mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-8">
-        <nav className="flex items-center justify-between gap-3">
-         <div className="flex items-center gap-3">
-  <img
-    src={rehearsalLogo}
-    alt="Rehearsal Room Logo"
-    className="h-12 w-12 rounded-2xl object-cover shadow-lg shadow-amber-900/30"
-  />
-
-  <div>
-    <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-300">
-      Rehearsal Room
-    </p>
-
-    <h1 className="mt-1 text-xl font-bold">Song Library</h1>
-  </div>
-</div>
-
-<div className="flex flex-wrap items-center justify-end gap-3">
-  <span className="rounded-full border border-white/10 bg-slate-950/70 px-4 py-3 text-sm font-semibold text-white">
-    {currentUser.role}
-  </span>
-
-            {isAdmin && (
-              <button
-                onClick={copyInviteLink}
-                className="rounded-full border border-amber-300/40 bg-amber-300/10 px-6 py-3 font-semibold text-amber-100 hover:bg-amber-300 hover:text-slate-950"
-              >
-                Copy Invite Link
-              </button>
-            )}
-
-<button
-  onClick={() => setRehearsalMode(!rehearsalMode)}
-  className="rounded-full border border-amber-300/40 bg-amber-300/10 px-5 py-3 font-semibold text-amber-100 hover:bg-amber-300 hover:text-slate-950"
->
-  {rehearsalMode ? "Exit Rehearsal Mode" : "Rehearsal Mode"}
-</button>
-
-
-
-            <button
-              onClick={logout}
-              className="rounded-full border border-white/10 px-5 py-3 font-semibold text-slate-200 hover:bg-white/10"
-            >
-              Logout
-            </button>
-
-            {isAdmin && (
-              <button
-                onClick={() => setShowAddSong(true)}
-                className="rounded-full bg-amber-400 px-6 py-3 font-semibold text-slate-950 shadow-lg shadow-amber-900/30 transition hover:bg-amber-300"
-              >
-                Add Song
-              </button>
-            )}
-          </div>
-        </nav>
-
-        {isAdmin && (
-          <div className="mt-4 rounded-xl border border-amber-300/10 bg-white/5 px-4 py-3 shadow-md">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="font-semibold text-amber-100">
-                  Choir Member Invite Link
-                </p>
-
-                <p className="mt-2 break-all text-sm text-slate-300">
-                  {inviteLink}
-                </p>
-
-                <p className="mt-3 text-sm text-slate-400">
-                  Members can scan this QR code or use the link to create their
-                  choir member account.
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-white p-4">
-                <QRCodeSVG value={inviteLink} size={140} />
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="mt-12 rounded-2xl border border-white/10 bg-white/10 p-5 shadow-1g backdrop-blur">
-          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-amber-300">
-            Welcome Back, {currentUser.fullName}
-          </p>
-
-          <h2 className="mt-4 text-5xl font-bold leading-tight">
-            Find the right song for rehearsal, fast.
-          </h2>
-
-          <div className="mt-8 flex flex-col gap-3 md:flex-row">
-            <input
-              type="text"
-              placeholder="Search by song title, key, or format..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-5 py-4 text-white outline-none placeholder:text-slate-500 focus:border-amber-300"
-            />
-
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="rounded-2xl border border-white/10 bg-slate-950/60 px-5 py-4 text-white outline-none focus:border-amber-300 md:w-64"
-            >
-              <option value="title">Sort by Title</option>
-              <option value="key">Sort by Key</option>
-              <option value="format">Sort by Format</option>
-            </select>
-          </div>
-        </div>
-
-<div className="mt-6 grid gap-4 md:grid-cols-4">
-  <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg">
-    <p className="text-sm text-slate-400">Total Songs</p>
-    <p className="mt-2 text-2xlfont-bold text-white">{songs.length}</p>
-    <p className="mt-2 text-sm text-amber-300">Song library</p>
-  </div>
-
-  <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg">
-    <p className="text-sm text-slate-400">Members</p>
-    <p className="mt-2 text-2xl font-bold text-white">{totalMembers}</p>
-    <p className="mt-2 text-sm text-green-300">Choir roster</p>
-  </div>
-
-  <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg">
-    <p className="text-sm text-slate-400">Attending</p>
-    <p className="mt-2 text-2xlfont-bold text-white">
-      {attendingCount}
-    </p>
-    <p className="mt-2 text-sm text-blue-300">For rehearsal</p>
-  </div>
-
-  <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg">
-    <p className="text-sm text-slate-400">Audio Uploads</p>
-    <p className="mt-2 text-2xl font-bold text-white">
-      {songs.filter((song) => song.audioFileName).length}
-    </p>
-    <p className="mt-2 text-sm text-purple-300">Practice tracks</p>
-  </div>
-</div>
-
-
-
-
-
-
-
-
-<div className="flex flex-col gap-2">
-  ...
-</div>
-
-
-
-        {showAddSong && isAdmin && (
-          <form
-            onSubmit={addSong}
-            className="mt-8 rounded-2xl border border-white/10 bg-white/10 p-6 shadow-1g backdrop-blur"
-          >
-            <h2 className="text-2xl font-bold">Add New Song</h2>
-
-            <div className="mt-5 grid gap-3 md:grid-cols-4">
-              <input
-                type="text"
-                placeholder="Song title"
-                value={newSong.title}
-                onChange={(e) =>
-                  setNewSong({
-                    ...newSong,
-                    title: e.target.value,
-                  })
-                }
-                className="rounded-2xl border border-white/10 bg-slate-950/70 px-5 py-3 text-white outline-none"
-              />
-
-              <input
-                type="text"
-                placeholder="Key"
-                value={newSong.key}
-                onChange={(e) =>
-                  setNewSong({
-                    ...newSong,
-                    key: e.target.value,
-                  })
-                }
-                className="rounded-2xl border border-white/10 bg-slate-950/70 px-5 py-3 text-white outline-none"
-              />
-
-              <input
-                type="text"
-                placeholder="Format"
-                value={newSong.format}
-                onChange={(e) =>
-                  setNewSong({
-                    ...newSong,
-                    format: e.target.value,
-                  })
-                }
-                className="rounded-2xl border border-white/10 bg-slate-950/70 px-5 py-3 text-white outline-none"
-              />
-
-              <input
-                type="text"
-                placeholder="YouTube Link"
-                value={newSong.youTubeLink}
-                onChange={(e) =>
-                  setNewSong({
-                    ...newSong,
-                    youTubeLink: e.target.value,
-                  })
-                }
-                className="rounded-2xl border border-white/10 bg-slate-950/70 px-5 py-3 text-white outline-none"
-              />
-            </div>
-
-<div className="flex flex-col gap-2">
-  <label className="text-sm text-slate-300">
-    Rehearsal Audio
-  </label>
-
-  <input
-    type="file"
-    accept=".mp3,.wav,.m4a,audio/*"
-    onChange={(e) =>
-      setNewSong({
-        ...newSong,
-        audioFile: e.target.files[0],
-      })
-    }
-    className="rounded-2xl border border-white/10 bg-slate-950/70 px-5 py-3 text-white outline-none"
-  />
-</div>
-
-
-
-
-
-
-
-            
-
-            <div className="mt-5 flex gap-3">
-              <button
-                type="submit"
-                className="rounded-2xl bg-amber-400 px-5 py-3 font-semibold text-slate-950 hover:bg-amber-300"
-              >
-                Save Song
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowAddSong(false)}
-                className="rounded-2xl border border-white/10 px-5 py-3 font-semibold text-slate-300 hover:bg-white/10"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        )}
-
-        {editingSong && isAdmin && (
-          <form
-            onSubmit={updateSong}
-            className="mt-8 rounded-2xl border border-white/10 bg-white/10 p-6 shadow-1g backdrop-blur"
-          >
-            <h2 className="text-2xl font-bold">Edit Song</h2>
-
-            <div className="mt-5 grid 3 md:grid-cols-4">
-              <input
-                type="text"
-                placeholder="Song title"
-                value={editSongForm.title}
-                onChange={(e) =>
-                  setEditSongForm({
-                    ...editSongForm,
-                    title: e.target.value,
-                  })
-                }
-                className="rounded-2xl border border-white/10 bg-slate-950/70 px-5 py-3 text-white outline-none"
-              />
-
-              <input
-                type="text"
-                placeholder="Key"
-                value={editSongForm.key}
-                onChange={(e) =>
-                  setEditSongForm({
-                    ...editSongForm,
-                    key: e.target.value,
-                  })
-                }
-                className="rounded-2xl border border-white/10 bg-slate-950/70 px-5 py-3 text-white outline-none"
-              />
-
-              <input
-                type="text"
-                placeholder="Format"
-                value={editSongForm.format}
-                onChange={(e) =>
-                  setEditSongForm({
-                    ...editSongForm,
-                    format: e.target.value,
-                  })
-                }
-                className="rounded-2xl border border-white/10 bg-slate-950/70 px-5 py-3 text-white outline-none"
-              />
-
-              <input
-                type="text"
-                placeholder="YouTube Link"
-                value={editSongForm.youTubeLink}
-                onChange={(e) =>
-                  setEditSongForm({
-                    ...editSongForm,
-                    youTubeLink: e.target.value,
-                  })
-                }
-                className="rounded-2xl border border-white/10 bg-slate-950/70 px-5 py-3 text-white outline-none"
-              />
-            </div>
-
-            <div className="mt-5 flex gap-3">
-              <button
-                type="submit"
-                className="rounded-2xl bg-amber-400 px-5 py-3 font-semibold text-slate-950 hover:bg-amber-300"
-              >
-                Save Changes
-              </button>
-
-              <button
-                type="button"
-                onClick={cancelEditSong}
-                className="rounded-2xl border border-white/10 px-5 py-3 font-semibold text-slate-300 hover:bg-white/10"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        )}
-
-        <section className="mt-10 rounded-2xl border border-white/10 bg-white/10 p-6 shadow-1g backdrop-blur">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.25em] text-amber-300">
-                Rehearsal Events
-              </p>
-
-              <h2 className="mt-2 text-xl font-bold">Upcoming Rehearsals</h2>
-            </div>
-
-            {isAdmin && (
-              <button
-                onClick={() => setShowAddEvent(true)}
-                className="rounded-full bg-amber-400 px-5 py-3 font-semibold text-slate-950 hover:bg-amber-300"
-              >
-                Add Event
-              </button>
-            )}
-          </div>
-
-          {showAddEvent && (
-            <form
-              onSubmit={addRehearsalEvent}
-              className="mt-6 rounded-2xl border border-white/10 bg-slate-950/40 p-5"
-            >
-              <div className="grid gap-3 md:grid-cols-3">
-                <input
-                  type="text"
-                  placeholder="Event title"
-                  value={newEvent.title}
-                  onChange={(e) =>
-                    setNewEvent({
-                      ...newEvent,
-                      title: e.target.value,
-                    })
-                  }
-                  className="rounded-2xl border border-white/10 bg-slate-950/70 px-5 py-3 text-white outline-none"
-                />
-
-                <input
-                  type="datetime-local"
-                  value={newEvent.eventDate}
-                  onChange={(e) =>
-                    setNewEvent({
-                      ...newEvent,
-                      eventDate: e.target.value,
-                    })
-                  }
-                  className="rounded-2xl border border-white/10 bg-slate-950/70 px-5 py-3 text-white outline-none"
-                />
-
-                <input
-                  type="text"
-                  placeholder="Notes"
-                  value={newEvent.notes}
-                  onChange={(e) =>
-                    setNewEvent({
-                      ...newEvent,
-                      notes: e.target.value,
-                    })
-                  }
-                  className="rounded-2xl border border-white/10 bg-slate-950/70 px-5 py-3 text-white outline-none"
-                />
-              </div>
-
-              <div className="mt-5 flex gap-3">
-                <button
-                  type="submit"
-                  className="rounded-2xl bg-amber-400 px-5 py-3 font-semibold text-slate-950 hover:bg-amber-300"
-                >
-                  Save Event
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowAddEvent(false)}
-                  className="rounded-2xl border border-white/10 px-5 py-3 font-semibold text-slate-300 hover:bg-white/10"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          )}
-
-          <div className="mt-6 grid gap-3">
-            {rehearsalEvents.length > 0 ? (
-              rehearsalEvents.map((event) => (
-                <div
-                  key={event.id}
-                  className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/40 p-5"
-                >
-                  <div>
-                    <h3 className="text-2xl font-semibold">{event.title}</h3>
-
-                    <p className="mt-2 text-slate-300">
-                      {new Date(event.eventDate).toLocaleString()}
-                    </p>
-
-                    {event.notes && (
-                      <p className="mt-1 text-sm text-slate-400">
-                        {event.notes}
-                      </p>
-                    )}
-                  </div>
-{isAdmin && (
-  <div className="mt-4 flex gap-3">
-    <select
-      value={selectedSongByEvent[event.id] || ""}
-      onChange={(e) =>
-        setSelectedSongByEvent((prev) => ({
-          ...prev,
-          [event.id]: e.target.value,
-        }))
-      }
-      className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none"
-    >
-      <option value="">Select song</option>
-
-      {songs.map((song) => (
-        <option key={song.id} value={song.id}>
-          {song.title}
-        </option>
-      ))}
-    </select>
-
-    <button
-      onClick={() => assignSongToRehearsal(event.id)}
-      className="rounded-2xl bg-amber-400 px-5 py-3 font-semibold text-slate-950 hover:bg-amber-300"
-    >
-      Add Song
-    </button>
-  </div>
-)}
-
-
-<div className="mt-4">
-  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] text-amber-300">
-    Setlist
-  </p>
-
-  <div className="flex flex-wrap gap-2">
-    {(rehearsalSongs[event.id] || []).map((item) => (
-      <span
-        key={item.id}
-        className="rounded-full border border-white/10 bg-slate-950/60 px-4 py-2 text-sm text-white"
-      >
-        {item.song?.title}
-      </span>
-    ))}
-  </div>
-</div>
-
-
-
-
-
-
-
-
-
-
-                  {isAdmin && (
-                    <button
-                      onClick={() => deleteEvent(event.id)}
-                      className="rounded-2xl bg-red-900/40 px-5 py-3 font-semibold text-red-200 hover:bg-red-600 hover:text-white"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-              ))
-            ) : (
-              <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-5 text-slate-400">
-                No rehearsal events yet.
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section
-  className={`mt-10 grid gap-5 ${
-    rehearsalMode ? "md:grid-cols-1" : ""
-  }`}
->
-
-<div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-6">
-  <h2 className="mb-4 text-2xl font-bold text-white">
-    Song Suggestions
-  </h2>
-
-  <div className="grid gap-4">
-    <input
-      type="text"
-      placeholder="Song Title"
-      value={suggestionTitle}
-      onChange={(e) => setSuggestionTitle(e.target.value)}
-      className="rounded-xl border border-white/10 bg-slate-900 p-3 text-white"
-    />
-
-    <input
-      type="text"
-      placeholder="Artist"
-      value={suggestionArtist}
-      onChange={(e) => setSuggestionArtist(e.target.value)}
-      className="rounded-xl border border-white/10 bg-slate-900 p-3 text-white"
-    />
-
-    <input
-      type="text"
-      placeholder="YouTube Link"
-      value={suggestionYouTubeLink}
-      onChange={(e) => setSuggestionYouTubeLink(e.target.value)}
-      className="rounded-xl border border-white/10 bg-slate-900 p-3 text-white"
-    />
-
-    <textarea
-      placeholder="Why should we sing this song?"
-      value={suggestionReason}
-      onChange={(e) => setSuggestionReason(e.target.value)}
-      className="rounded-xl border border-white/10 bg-slate-900 p-3 text-white"
-    />
-
-    <button
-      onClick={submitSongSuggestion}
-      className="rounded-xl bg-amber-400 px-4 py-3 font-semibold text-slate-900 hover:bg-amber-300"
-    >
-      Submit Suggestion
-    </button>
-  </div>
-</div>
-
-
-
-
-
-
-          {filteredSongs.length > 0 ? (
-            filteredSongs.map((song) => (
-              <div
-                key={song.id}
-                className={`rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur ${
-  rehearsalMode
-    ? "flex flex-col items-start gap-3"
-    : "flex items-center justify-between"
-}`}
-              >
-                <div>
-                  <h3 className="text-2xlfont-bold text-white">
-  <h3 className="text-2xl font-bold text-white">
-  🎵 {song.title}
-</h3>
-</h3>
-<div className="mt-3 flex flex-wrap gap-2">
-  <span className="rounded-full bg-purple-500/20 px-3 py-1 text-sm text-purple-200">
-    Key: {song.key}
-  </span>
-
-  <span className="rounded-full bg-blue-500/20 px-3 py-1 text-sm text-blue-200">
-    Format: {song.format}
-  </span>
-</div>
-
-                  {song.youTubeLink && (
-                    <a
-                      href={song.youTubeLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-2 inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500"
-                    >
-                      <span>▶</span>
-                      Watch on YouTube
-                    </a> 
-                  )}
-
-{song.audioFileName && (
-  <audio controls className="mt-4 w-full rounded-xl">
-    <source
-      src={`http://localhost:5281/audio/${song.audioFileName}`}
-      type="audio/mpeg"
-    />
-  </audio>
-)}
-
-
-
-                </div>
-
-                {isAdmin && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => startEditSong(song)}
-                      className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-semibold text-slate-200 hover:bg-white/10"
-                    >
-                      Edit
-                    </button>
-
-                    <button
-                      onClick={() => deleteSong(song.id)}
-                      className="rounded-2xl bg-red-900/40 px-5 py-3 font-semibold text-red-200 hover:bg-red-600 hover:text-white"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))
-          ) : (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-slate-300">
-              No songs found.
-            </div>
-          )}
-        </section>
-
-        <section className="mt-12 rounded-2xl border border-white/10 bg-white/10 p-6 shadow-1g backdrop-blur">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.25em] text-amber-300">
-                Rehearsal Attendance
-              </p>
-
-              <h2 className="mt-2 text-xl font-bold">
-                Will you be at rehearsal?
-              </h2>
-
-              <select
-                value={selectedEventId || ""}
-                onChange={(e) => setSelectedEventId(Number(e.target.value))}
-                className="mt-4 rounded-2xl border border-white/10 bg-slate-950/70 px-5 py-3 text-white outline-none"
-              >
-                <option value="">Select rehearsal event</option>
-
-                {rehearsalEvents.map((event) => (
-                  <option key={event.id} value={event.id}>
-                    {event.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {isAdmin && (
-              <button
-                onClick={() => setShowAddMember(true)}
-                className="rounded-full bg-amber-400 px-5 py-2 font-semibold text-slate-950 hover:bg-amber-300"
-              >
-                Add Member
-              </button>
-            )}
-          </div>
-
-          {selectedEventId && (
-            <div className="mb-6 grid gap-3 md:grid-cols-5">
-              <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-5">
-                <p className="text-sm text-slate-400">Total Members</p>
-                <p className="mt-2 text-xlfont-bold">{totalMembers}</p>
-              </div>
-
-              <div className="rounded-2xl border border-green-400/20 bg-green-500/10 p-5">
-                <p className="text-sm text-green-200">Attending</p>
-                <p className="mt-2 text-xl font-bold text-green-300">
-                  {attendingCount}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-5">
-                <p className="text-sm text-red-200">Not Attending</p>
-                <p className="mt-2 text-xl font-bold text-red-300">
-                  {notAttendingCount}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-5">
-                <p className="text-sm text-slate-400">No Response</p>
-                <p className="mt-2 text-xl font-bold">{noResponseCount}</p>
-              </div>
-
-              <div className="rounded-2xl border border-amber-300/30 bg-amber-300/10 p-5">
-                <p className="text-sm text-amber-200">Attendance</p>
-                <p className="mt-2 text-xl font-bold text-amber-300">
-                  {attendancePercentage}%
-                </p>
-              </div>
-            </div>
-          )}
-
-          {!isAdmin && (
-            <p className="mb-5 rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-300">
-              You can only update attendance for your own name.
-            </p>
-          )}
-
-          {showAddMember && isAdmin && (
-            <form onSubmit={addMember} className="mb-6 flex gap-3">
-              <input
-                type="text"
-                value={newMemberName}
-                onChange={(e) => setNewMemberName(e.target.value)}
-                placeholder="Enter name..."
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-5 py-3 text-white outline-none"
-              />
-
-              <button className="rounded-2xl bg-amber-400 px-5 py-3 font-semibold text-slate-950">
-                Save
-              </button>
-            </form>
-          )}
-
-          <div className="grid gap-3">
-            {choirMembers.map((member) => {
-              const canEditThisMember = canUpdateMemberAttendance(member);
-
-              return (
-                <div
-                  key={member.id}
-                  className={`flex items-center justify-between rounded-2xl border p-5 ${
-                    canEditThisMember
-                      ? "border-amber-300/30 bg-slate-950/50"
-                      : "border-white/10 bg-slate-950/30 opacity-60"
-                  }`}
-                >
-                  <div>
-                    <h3 className="text-xl font-semibold">{member.name}</h3>
-
-                    <p className="text-sm text-slate-400">
-                      {getAttendanceStatus(member.id) === true
-                        ? "Attending"
-                        : getAttendanceStatus(member.id) === false
-                        ? "Not attending"
-                        : "No response yet"}
-                    </p>
-
-                    {!isAdmin && canEditThisMember && (
-                      <p className="mt-1 text-xs font-semibold text-amber-300">
-                        This is your attendance.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2">
-                    {canEditThisMember ? (
-                      <>
-                        <button
-                          onClick={() => updateAttendance(member, true)}
-                          className="rounded-full bg-green-500/20 px-4 py-2 text-sm font-semibold text-green-300 hover:bg-green-500 hover:text-white"
-                        >
-                          Yes
-                        </button>
-
-                        <button
-                          onClick={() => updateAttendance(member, false)}
-                          className="rounded-full bg-red-500/20 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500 hover:text-white"
-                        >
-                          No
-                        </button>
-                      </>
-                    ) : (
-                      <span className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-400">
-                        View Only
-                      </span>
-                    )}
-
-                    {isAdmin && (
-                      <button
-                        onClick={() => deleteMember(member.id)}
-                        className="rounded-full bg-red-900/40 px-4 py-2 text-sm font-semibold text-red-200 hover:bg-red-600 hover:text-white"
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
       </section>
     </main>
-    );
+  );
 }
-export default App;
+
+function AuthInput({ label, value, onChange, placeholder, type = "text" }) {
+  return (
+    <label>
+      <span className="text-sm font-bold text-slate-200">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-amber-400"
+      />
+    </label>
+  );
+}
+
+function FeatureCard({ title, text }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <p className="font-black text-amber-300">{title}</p>
+      <p className="mt-2 text-sm text-slate-400">{text}</p>
+    </div>
+  );
+}

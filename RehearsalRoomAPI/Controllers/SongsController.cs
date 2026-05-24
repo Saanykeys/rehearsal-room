@@ -8,8 +8,8 @@ using RehearsalRoomAPI.Models;
 namespace RehearsalRoomAPI.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
-    //[Authorize]
+    [Route("api/[controller]")] // Fixed: was [controller] (no api/) — now consistent with all other controllers
+    [Authorize]                 // Fixed: [Authorize] was commented out, leaving all reads public
     public class SongsController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -19,14 +19,15 @@ namespace RehearsalRoomAPI.Controllers
             _context = context;
         }
 
+        // Any logged-in user can view songs
         [HttpGet]
         public async Task<IEnumerable<SongResponseDto>> Get()
         {
             var songs = await _context.Songs.ToListAsync();
-
             return songs.Select(ToSongResponseDto);
         }
 
+        // Any logged-in user can search songs
         [HttpGet("search")]
         public async Task<IEnumerable<SongResponseDto>> Search([FromQuery] string query)
         {
@@ -45,6 +46,7 @@ namespace RehearsalRoomAPI.Controllers
             return songs.Select(ToSongResponseDto);
         }
 
+        // Only Admins can add songs
         [HttpPost]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<SongResponseDto>> Create(CreateSongDto dto)
@@ -63,6 +65,7 @@ namespace RehearsalRoomAPI.Controllers
             return Ok(ToSongResponseDto(song));
         }
 
+        // Only Admins can update songs
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<SongResponseDto>> Update(int id, UpdateSongDto dto)
@@ -84,6 +87,7 @@ namespace RehearsalRoomAPI.Controllers
             return Ok(ToSongResponseDto(song));
         }
 
+        // Only Admins can delete songs
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)

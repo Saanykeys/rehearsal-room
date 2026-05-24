@@ -1,14 +1,14 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RehearsalRoomAPI.Data;
 using RehearsalRoomAPI.Models;
-using Microsoft.AspNetCore.Authorization;
 
 namespace RehearsalRoomAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-//[Authorize]
+    [Authorize] // Fixed: [Authorize] was commented out
     public class AttendanceRecordsController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -18,12 +18,14 @@ namespace RehearsalRoomAPI.Controllers
             _context = context;
         }
 
+        // Any logged-in user can view attendance
         [HttpGet]
         public async Task<ActionResult<IEnumerable<AttendanceRecord>>> GetAttendanceRecords()
         {
             return await _context.AttendanceRecords.ToListAsync();
         }
 
+        // Any logged-in user can view attendance for a specific rehearsal
         [HttpGet("rehearsal/{rehearsalEventId}")]
         public async Task<ActionResult<IEnumerable<AttendanceRecord>>> GetByRehearsal(int rehearsalEventId)
         {
@@ -32,6 +34,7 @@ namespace RehearsalRoomAPI.Controllers
                 .ToListAsync();
         }
 
+        // Any logged-in user can submit their attendance
         [HttpPost]
         public async Task<ActionResult<AttendanceRecord>> CreateAttendanceRecord(AttendanceRecord record)
         {
@@ -47,6 +50,7 @@ namespace RehearsalRoomAPI.Controllers
             return Ok(record);
         }
 
+        // Any logged-in user can update their own attendance status
         [HttpPut("{id}/status")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] string status)
         {
@@ -65,7 +69,9 @@ namespace RehearsalRoomAPI.Controllers
             return Ok(record);
         }
 
+        // Only Admins can delete attendance records
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteAttendanceRecord(int id)
         {
             var record = await _context.AttendanceRecords.FindAsync(id);

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import rehearsalLogo from "./assets/rehearsalroom-logo.png";
 import AdminDashboard from "./components/AdminDashboard";
+import LandingPage from "./pages/LandingPage";
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
@@ -101,7 +102,12 @@ export default function App() {
   };
 
   if (!isLoggedIn && !showAuth) {
-    return <LandingPage onGetStarted={() => setShowAuth(true)} />;
+    return (
+      <LandingPage
+        onGetStarted={() => { setAuthMode("register"); setShowAuth(true); }}
+        onLogin={() => { setAuthMode("login"); setShowAuth(true); }}
+      />
+    );
   }
 
   if (!isLoggedIn && showAuth) {
@@ -146,55 +152,6 @@ const getSongsForRehearsal = (rehearsal) => {
   );
 }
 
-function LandingPage({ onGetStarted }) {
-  return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 px-6 py-8 text-white">
-      <section className="mx-auto flex min-h-[85vh] max-w-6xl items-center">
-       <div className="grid w-full gap-10 overflow-hidden lg:grid-cols-[1fr_0.8fr] lg:items-center">
-          <div>
-            <div className="flex items-center gap-4">
-              <img
-                src={rehearsalLogo}
-                alt="Rehearsal Room Logo"
-                className="h-16 w-16 rounded-2xl object-cover shadow-lg shadow-amber-900/30"
-              />
-
-              <p className="text-sm font-black uppercase tracking-[0.35em] text-amber-300">
-                Rehearsal Room
-              </p>
-            </div>
-
-           <h1 className="mt-8 text-4xl font-black leading-tight sm:text-5xl md:text-6xl lg:text-7xl">
-              Run rehearsals with clarity, confidence, and order.
-            </h1>
-
-          <p className="mt-6 max-w-2xl text-base text-slate-300 sm:text-lg">
-              Manage songs, members, attendance, rehearsals, and worship team
-              planning from one modern dashboard.
-            </p>
-
-            <button
-              onClick={onGetStarted}className="mt-8 rounded-2xl bg-amber-400 px-6 py-3 text-basefont-black text-slate-950 shadow-xl transition hover:scale-105"
-            >
-              Get Started
-            </button>
-          </div>
- 
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 md:p-6shadow-2xl backdrop-blur">
-            <h2 className="text-3xl font-black">Built for worship teams</h2>
-
-            <div className="mt-6 grid gap-4">
-              <FeatureCard title="Song Library" text="Store songs, keys, notes, and videos." />
-              <FeatureCard title="Members" text="Invite team members and manage roles." />
-              <FeatureCard title="Attendance" text="Track who is confirmed for rehearsal." />
-              <FeatureCard title="Dashboard" text="Give leaders one clean place to manage everything." />
-            </div>
-          </div>
-        </div>
-      </section>
-    </main>
-  );
-}
 
 function AuthScreen({
   authMode,

@@ -64,7 +64,7 @@ const emptyInviteForm = {
 
 export default function AdminDashboard({ currentUser, token, onLogout }) {
   // currentRole drives ALL permission checks — synced from currentUser on mount
-  const [currentRole, setCurrentRole] = useState(currentUser?.role || "Admin");
+  const [currentRole, setCurrentRole] = useState(currentUser?.role || "Team Member");
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -841,25 +841,27 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
             })}
           </nav>
 
-          {/* Role switcher in sidebar (mobile) */}
-          <div className="mt-8 lg:hidden">
-            <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">View As</p>
-            <div className="space-y-2">
-              {["Music Director", "Team Member"].map((role) => (
-                <button
-                  key={role}
-                  onClick={() => { switchRole(role); setSidebarOpen(false); }}
-                  className={`w-full rounded-xl px-4 py-2 text-left text-sm font-bold transition-all ${
-                    currentRole === role
-                      ? "bg-amber-400 text-slate-950"
-                      : "bg-white/5 text-slate-400 hover:bg-white/10"
-                  }`}
-                >
-                  {role}
-                </button>
-              ))}
+          {/* Role switcher in sidebar (mobile) — directors only */}
+          {currentUser?.role === "Music Director" && (
+            <div className="mt-8 lg:hidden">
+              <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">View As</p>
+              <div className="space-y-2">
+                {["Music Director", "Team Member"].map((role) => (
+                  <button
+                    key={role}
+                    onClick={() => { switchRole(role); setSidebarOpen(false); }}
+                    className={`w-full rounded-xl px-4 py-2 text-left text-sm font-bold transition-all ${
+                      currentRole === role
+                        ? "bg-amber-400 text-slate-950"
+                        : "bg-white/5 text-slate-400 hover:bg-white/10"
+                    }`}
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Sidebar logout */}
           <button
@@ -883,22 +885,24 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
             </div>
 
             <div className="flex items-center gap-3">
-              {/* Dev role switcher */}
-              <div className="hidden items-center gap-2 sm:flex">
-                {["Music Director", "Team Member"].map((role) => (
-                  <button
-                    key={role}
-                    onClick={() => switchRole(role)}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-black transition-all ${
-                      currentRole === role
-                        ? "bg-amber-400 text-slate-950"
-                        : "bg-white/10 text-slate-300 hover:bg-white/15"
-                    }`}
-                  >
-                    {role}
-                  </button>
-                ))}
-              </div>
+              {/* Role switcher — only directors can preview team member view */}
+              {currentUser?.role === "Music Director" && (
+                <div className="hidden items-center gap-2 sm:flex">
+                  {["Music Director", "Team Member"].map((role) => (
+                    <button
+                      key={role}
+                      onClick={() => switchRole(role)}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-black transition-all ${
+                        currentRole === role
+                          ? "bg-amber-400 text-slate-950"
+                          : "bg-white/10 text-slate-300 hover:bg-white/15"
+                      }`}
+                    >
+                      {role}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Notification bell */}
               <div className="relative" ref={notifRef}>

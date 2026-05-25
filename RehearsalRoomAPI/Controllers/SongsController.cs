@@ -46,17 +46,20 @@ namespace RehearsalRoomAPI.Controllers
             return songs.Select(ToSongResponseDto);
         }
 
-        // Only Admins can add songs
+        // Only Music Directors can add songs
         [HttpPost]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Music Director")]
         public async Task<ActionResult<SongResponseDto>> Create(CreateSongDto dto)
         {
             var song = new Song
             {
                 Title = dto.Title,
+                Artist = dto.Artist,
                 Key = dto.Key,
+                Tempo = dto.Tempo,
                 Category = dto.Category,
-                YoutubeLink = dto.YoutubeLink
+                YoutubeLink = dto.YoutubeLink,
+                Notes = dto.Notes
             };
 
             _context.Songs.Add(song);
@@ -65,9 +68,9 @@ namespace RehearsalRoomAPI.Controllers
             return Ok(ToSongResponseDto(song));
         }
 
-        // Only Admins can update songs
+        // Only Music Directors can update songs
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Music Director")]
         public async Task<ActionResult<SongResponseDto>> Update(int id, UpdateSongDto dto)
         {
             var song = await _context.Songs.FindAsync(id);
@@ -78,18 +81,21 @@ namespace RehearsalRoomAPI.Controllers
             }
 
             song.Title = dto.Title;
+            song.Artist = dto.Artist;
             song.Key = dto.Key;
+            song.Tempo = dto.Tempo;
             song.Category = dto.Category;
             song.YoutubeLink = dto.YoutubeLink;
+            song.Notes = dto.Notes;
 
             await _context.SaveChangesAsync();
 
             return Ok(ToSongResponseDto(song));
         }
 
-        // Only Admins can delete songs
+        // Only Music Directors can delete songs
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Music Director")]
         public async Task<IActionResult> Delete(int id)
         {
             var song = await _context.Songs.FindAsync(id);
@@ -111,9 +117,12 @@ namespace RehearsalRoomAPI.Controllers
             {
                 Id = song.Id,
                 Title = song.Title,
+                Artist = song.Artist,
                 Key = song.Key,
+                Tempo = song.Tempo,
                 Category = song.Category,
-                YoutubeLink = song.YoutubeLink
+                YoutubeLink = song.YoutubeLink,
+                Notes = song.Notes
             };
         }
     }

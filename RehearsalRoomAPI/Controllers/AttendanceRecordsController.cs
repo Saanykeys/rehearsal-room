@@ -71,7 +71,7 @@ namespace RehearsalRoomAPI.Controllers
 
         // Only Admins can delete attendance records
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Music Director")]
         public async Task<IActionResult> DeleteAttendanceRecord(int id)
         {
             var record = await _context.AttendanceRecords.FindAsync(id);

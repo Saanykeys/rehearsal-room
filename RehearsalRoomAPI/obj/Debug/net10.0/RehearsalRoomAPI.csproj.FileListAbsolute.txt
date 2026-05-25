@@ -159,3 +159,7 @@ C:\Users\saany\OneDrive\Desktop\RehearsalRoomClean\RehearsalRoomAPI\obj\Debug\ne
 C:\Users\saany\OneDrive\Desktop\RehearsalRoomClean\RehearsalRoomAPI\obj\Debug\net10.0\RehearsalRoomAPI.pdb
 C:\Users\saany\OneDrive\Desktop\RehearsalRoomClean\RehearsalRoomAPI\obj\Debug\net10.0\RehearsalRoomAPI.genruntimeconfig.cache
 C:\Users\saany\OneDrive\Desktop\RehearsalRoomClean\RehearsalRoomAPI\obj\Debug\net10.0\ref\RehearsalRoomAPI.dll
+C:\Users\saany\OneDrive\Desktop\RehearsalRoomClean\RehearsalRoomAPI\bin\Debug\net10.0\Npgsql.dll
+C:\Users\saany\OneDrive\Desktop\RehearsalRoomClean\RehearsalRoomAPI\bin\Debug\net10.0\Npgsql.EntityFrameworkCore.PostgreSQL.dll
+C:\Users\saany\OneDrive\Desktop\RehearsalRoomClean\RehearsalRoomAPI\bin\Debug\net10.0\BouncyCastle.Crypto.dll
+C:\Users\saany\OneDrive\Desktop\RehearsalRoomClean\RehearsalRoomAPI\bin\Debug\net10.0\WebPush.dll

@@ -8,7 +8,7 @@ namespace RehearsalRoomAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    //[Authorize]
+    [Authorize]
     public class SongSuggestionsController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -39,7 +39,7 @@ namespace RehearsalRoomAPI.Controllers
         }
 
         [HttpPut("{id}/approve")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Music Director")]
         public async Task<IActionResult> ApproveSuggestion(int id)
         {
             var suggestion = await _context.SongSuggestions.FindAsync(id);
@@ -56,7 +56,7 @@ namespace RehearsalRoomAPI.Controllers
         }
 
         [HttpPut("{id}/reject")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Music Director")]
         public async Task<IActionResult> RejectSuggestion(int id)
         {
             var suggestion = await _context.SongSuggestions.FindAsync(id);
@@ -73,7 +73,7 @@ namespace RehearsalRoomAPI.Controllers
         }
 
         [HttpPost("{id}/add-to-library")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Music Director")]
         public async Task<IActionResult> AddSuggestionToLibrary(int id)
         {
             var suggestion = await _context.SongSuggestions.FindAsync(id);

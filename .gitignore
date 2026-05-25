@@ -8,6 +8,10 @@ obj/
 *.db-shm
 *.db-wal
 
+# Local secrets — never commit these
+appsettings.Development.json
+appsettings.Local.json
+
 # Node
 node_modules/
 dist/

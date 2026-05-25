@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   LayoutDashboard,
   Music,
@@ -27,7 +27,7 @@ import {
   User,
 } from "lucide-react";
 
-const API_BASE = "http://localhost:5281";
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5281";
 
 const emptySongForm = {
   title: "",
@@ -57,7 +57,9 @@ const emptyAnnouncementForm = {
 const emptyInviteForm = {
   fullName: "",
   email: "",
-  role: "Choir Member",
+  password: "",
+  role: "Team Member",
+  directorCode: "",
 };
 
 export default function AdminDashboard({ currentUser, token, onLogout }) {
@@ -67,9 +69,9 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Permissions — always derived from currentRole so the dev switcher works correctly
-  const isAdmin = currentRole === "Admin";
-  const isMusician = currentRole === "Musician";
-  const isChoirMember = currentRole === "Choir Member";
+  const isAdmin = currentRole === "Music Director";
+  const isMusician = currentRole === "Team Member";
+  const isChoirMember = false;
 
   // Auth headers used for every API call
   const authHeaders = {
@@ -95,9 +97,16 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
   const [rehearsalForm, setRehearsalForm] = useState(emptyRehearsalForm);
   const [rehearsalError, setRehearsalError] = useState("");
 
+  // ── Announcements ────────────────────────────────────────────────────────
+  const [announcements, setAnnouncements] = useState([]);
+  const [announcementForm, setAnnouncementFormState] = useState({ title: "", body: "" });
+  const [announcementLoading, setAnnouncementLoading] = useState(false);
+  const [announcementMsg, setAnnouncementMsg] = useState("");
+
   // ── Attendance ───────────────────────────────────────────────────────────
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [attendanceLoaded, setAttendanceLoaded] = useState(false);
+  const [attendanceRehearsalId, setAttendanceRehearsalId] = useState(null);
 
   // ── Members ──────────────────────────────────────────────────────────────
   const [members, setMembers] = useState([]);
@@ -114,11 +123,6 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
   const [memberSearch, setMemberSearch] = useState("");
   const [memberRoleFilter, setMemberRoleFilter] = useState("All");
 
-  // ── Announcements ────────────────────────────────────────────────────────
-  const [announcements, setAnnouncements] = useState([]);
-  const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
-  const [announcementForm, setAnnouncementForm] = useState(emptyAnnouncementForm);
-
   // ── Settings ─────────────────────────────────────────────────────────────
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
@@ -126,11 +130,23 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
     confirmPassword: "",
   });
   const [passwordMsg, setPasswordMsg] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
+  const [nameValue, setNameValue] = useState(currentUser?.fullName || "");
+  const [nameMsg, setNameMsg] = useState("");
+  const [nameError, setNameError] = useState("");
+  const [nameLoading, setNameLoading] = useState(false);
+
+  // ── Notifications ─────────────────────────────────────────────────────────
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [dismissedNotifIds, setDismissedNotifIds] = useState([]);
+  const notifRef = useRef(null);
 
   // ── Data loaders ─────────────────────────────────────────────────────────
   const loadSongs = async () => {
     try {
-      const res = await fetch(`${API_BASE}/Songs`, { headers: authHeaders });
+      const res = await fetch(`${API_BASE}/api/Songs`, { headers: authHeaders });
       const data = await res.json();
       setSongs(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -180,12 +196,63 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
     }
   };
 
+  const loadAnnouncements = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/Announcements`, { headers: authHeaders });
+      const data = await res.json();
+      setAnnouncements(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load announcements", err);
+    }
+  };
+
+  const postAnnouncement = async () => {
+    if (!announcementForm.title.trim()) {
+      setAnnouncementMsg("Please enter a title.");
+      return;
+    }
+    setAnnouncementLoading(true);
+    setAnnouncementMsg("");
+    try {
+      const res = await fetch(`${API_BASE}/api/Announcements`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify(announcementForm),
+      });
+      if (!res.ok) {
+        setAnnouncementMsg("Failed to post announcement.");
+        return;
+      }
+      const created = await res.json();
+      setAnnouncements((prev) => [created, ...prev]);
+      setAnnouncementFormState({ title: "", body: "" });
+      setAnnouncementMsg("Announcement posted!");
+    } catch {
+      setAnnouncementMsg("Could not reach the server.");
+    } finally {
+      setAnnouncementLoading(false);
+    }
+  };
+
+  const deleteAnnouncement = async (id) => {
+    try {
+      await fetch(`${API_BASE}/api/Announcements/${id}`, {
+        method: "DELETE",
+        headers: authHeaders,
+      });
+      setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+    } catch (err) {
+      console.error("Failed to delete announcement", err);
+    }
+  };
+
   useEffect(() => {
     loadSongs();
     loadSongSuggestions();
     loadRehearsals();
     loadMembers();
     loadAttendanceRecords();
+    loadAnnouncements();
   }, []);
 
   // ── Songs CRUD ────────────────────────────────────────────────────────────
@@ -226,8 +293,8 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
     }
     const method = editingSongId ? "PUT" : "POST";
     const url = editingSongId
-      ? `${API_BASE}/Songs/${editingSongId}`
-      : `${API_BASE}/Songs`;
+      ? `${API_BASE}/api/Songs/${editingSongId}`
+      : `${API_BASE}/api/Songs`;
     const res = await fetch(url, {
       method,
       headers: authHeaders,
@@ -243,7 +310,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
 
   const deleteSong = async (song) => {
     if (!window.confirm(`Delete "${song.title}" from the library?`)) return;
-    const res = await fetch(`${API_BASE}/Songs/${song.id}`, {
+    const res = await fetch(`${API_BASE}/api/Songs/${song.id}`, {
       method: "DELETE",
       headers: authHeaders,
     });
@@ -309,6 +376,8 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
   };
 
   // ── Rehearsals CRUD ───────────────────────────────────────────────────────
+  const getTodayDate = () => new Date().toISOString().split("T")[0];
+
   const openAddRehearsalForm = () => {
     setEditingRehearsalId(null);
     setRehearsalForm({
@@ -324,7 +393,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
     setEditingRehearsalId(rehearsal.id);
     setRehearsalForm({
       title: rehearsal.title || "",
-      eventDate: rehearsal.eventDate || "",
+      eventDate: rehearsal.eventDate ? rehearsal.eventDate.split("T")[0] : "",
       eventTime: rehearsal.eventTime || "19:00",
       location: rehearsal.location || "Main Sanctuary",
       notes: rehearsal.notes || "",
@@ -382,6 +451,8 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
         setRehearsals((prev) => prev.map((r) => (r.id === editingRehearsalId ? saved : r)));
       } else {
         setRehearsals((prev) => [...prev, saved]);
+        // Reload attendance so the auto-seeded records show up immediately
+        await loadAttendanceRecords();
       }
       closeRehearsalForm();
     } catch (err) {
@@ -406,17 +477,18 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
 
   // ── Attendance ────────────────────────────────────────────────────────────
   const seedAttendanceRecords = async (rehearsalEventId) => {
-    const defaultTeam = [
-      { memberName: "Marcus Johnson", role: "Keyboard", status: "Confirmed" },
-      { memberName: "Tiana Brooks", role: "Lead Vocal", status: "Pending" },
-      { memberName: "James Carter", role: "Drums", status: "Declined" },
-      { memberName: "Ashley Green", role: "Background Vocal", status: "Confirmed" },
-      { memberName: "Brian Miller", role: "Bass", status: "Pending" },
-      { memberName: "Denise Carter", role: "Choir Lead", status: "Confirmed" },
-    ];
+    const teamToSeed = members.length > 0
+      ? members.map((m) => ({
+          memberName: m.fullName || m.email?.split("@")[0] || "Member",
+          role: m.role || "Member",
+          status: "Pending",
+        }))
+      : [
+          { memberName: "Team Member", role: "Member", status: "Pending" },
+        ];
     try {
       const created = await Promise.all(
-        defaultTeam.map(async (member) => {
+        teamToSeed.map(async (member) => {
           const res = await fetch(`${API_BASE}/api/AttendanceRecords`, {
             method: "POST",
             headers: authHeaders,
@@ -456,23 +528,42 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
 
   // ── Members CRUD ──────────────────────────────────────────────────────────
   const handleInviteMember = async () => {
-    if (!inviteMemberForm.fullName.trim() || !inviteMemberForm.email.trim()) {
-      alert("Please complete all fields.");
+    const { fullName, email, password, role } = inviteMemberForm;
+    if (!fullName.trim() || !email.trim() || !password.trim()) {
+      alert("Please fill in name, email, and password.");
+      return;
+    }
+    if (password.length < 8) {
+      alert("Password must be at least 8 characters.");
       return;
     }
     try {
-      const res = await fetch(`${API_BASE}/api/Members`, {
+      // Register the new user via the Auth endpoint (creates a real hashed account)
+      // Director code is passed through from the form — backend verifies it server-side
+      const payload = {
+        fullName: fullName.trim(),
+        email: email.trim(),
+        password,
+        directorCode: inviteMemberForm.directorCode ?? "",
+      };
+      const res = await fetch(`${API_BASE}/api/Auth/register`, {
         method: "POST",
-        headers: authHeaders,
-        body: JSON.stringify(inviteMemberForm),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error();
-      const saved = await res.json();
-      setMembers((prev) => [...prev, saved]);
+      const text = await res.text();
+      let data = null;
+      try { data = JSON.parse(text); } catch { data = text; }
+      if (!res.ok) {
+        alert(typeof data === "string" ? data : data?.message || "Could not add member.");
+        return;
+      }
+      // Reload members so the new user shows up
+      await loadMembers();
       setInviteMemberForm(emptyInviteForm);
       setShowInviteMemberForm(false);
     } catch {
-      alert("Could not save member.");
+      alert("Could not save member. Check backend is running.");
     }
   };
 
@@ -506,16 +597,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
     }
   };
 
-  // ── Announcements ─────────────────────────────────────────────────────────
-  const postAnnouncement = () => {
-    if (!announcementForm.title.trim()) return;
-    setAnnouncements((prev) => [
-      { id: Date.now(), ...announcementForm },
-      ...prev,
-    ]);
-    setAnnouncementForm(emptyAnnouncementForm);
-    setShowAnnouncementForm(false);
-  };
+  // postAnnouncement is defined above with the loadAnnouncements function
 
   // ── Derived values ────────────────────────────────────────────────────────
   const categories = useMemo(() => {
@@ -541,6 +623,24 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
   });
 
   const pendingSuggestions = songSuggestions.filter((s) => s.status === "Pending");
+
+  const rolePillActive = (role) => {
+    if (role === "Music Director") return "bg-amber-400 text-slate-950";
+    return "bg-indigo-500 text-white";
+  };
+
+  const roleAvatarBg = (role) => {
+    if (role === "Music Director") return "bg-amber-400/20 text-amber-300";
+    return "bg-indigo-500/20 text-indigo-300";
+  };
+
+  const roleBadgeStyle = (role) => {
+    if (role === "Music Director") return "bg-amber-400/20 text-amber-300 border border-amber-400/30";
+    return "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30";
+  };
+
+  const getInitials = (name = "") =>
+    name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
   const recentSongs = songs.slice(-3).reverse();
   const upcomingRehearsal = rehearsals[0] ?? null;
 
@@ -551,6 +651,14 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
       seedAttendanceRecords(upcomingRehearsal.id);
     }
   }, [attendanceLoaded, upcomingRehearsal?.id]);
+
+  // Seed attendance when switching to a rehearsal with no records
+  useEffect(() => {
+    if (!attendanceRehearsalId || !attendanceLoaded) return;
+    if (getAttendanceByRehearsal(attendanceRehearsalId).length === 0) {
+      seedAttendanceRecords(attendanceRehearsalId);
+    }
+  }, [attendanceRehearsalId]);
 
   const upcomingSongs =
     upcomingRehearsal?.songIds?.length > 0
@@ -568,15 +676,101 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
     (confirmedCount / (upcomingAttendance.length || 1)) * 100
   );
 
+  // ── Attendance tab derived values ─────────────────────────────────────────
+  const selectedAttendanceId = attendanceRehearsalId ?? upcomingRehearsal?.id ?? null;
+  const selectedAttendanceRehearsal = rehearsals.find((r) => r.id === selectedAttendanceId) ?? upcomingRehearsal;
+  const selectedAttendance = selectedAttendanceId ? getAttendanceByRehearsal(selectedAttendanceId) : [];
+  const myRecord = selectedAttendance.find(
+    (r) => r.memberName === (currentUser?.fullName || currentUser?.email?.split("@")[0])
+  );
+  const selConfirmed = selectedAttendance.filter((r) => r.status === "Confirmed").length;
+  const selPending = selectedAttendance.filter((r) => r.status === "Pending").length;
+  const selDeclined = selectedAttendance.filter((r) => r.status === "Declined").length;
+
+  // ── Notifications data ────────────────────────────────────────────────────
+  const notifications = useMemo(() => {
+    const items = [];
+
+    // Announcements always come first — live from the database
+    announcements.forEach((a) => {
+      items.push({
+        id: `announcement-${a.id}`,
+        type: "announcement",
+        color: "text-emerald-300",
+        icon: Bell,
+        title: a.title,
+        body: a.body,
+        createdBy: a.createdBy,
+        tab: null,
+      });
+    });
+
+    pendingSuggestions.forEach((s) => {
+      items.push({
+        id: `suggestion-${s.id}`,
+        type: "suggestion",
+        color: "text-amber-300",
+        icon: Lightbulb,
+        title: `New suggestion: "${s.title}"`,
+        body: `Suggested by ${s.suggestedBy}`,
+        tab: "Suggestions",
+      });
+    });
+
+    if (upcomingRehearsal) {
+      items.push({
+        id: `rehearsal-${upcomingRehearsal.id}`,
+        type: "rehearsal",
+        color: "text-blue-300",
+        icon: CalendarDays,
+        title: `Upcoming: ${upcomingRehearsal.title}`,
+        body: `${formatRehearsalDate(upcomingRehearsal.eventDate)} · ${formatTime(upcomingRehearsal.eventTime)}`,
+        tab: "Rehearsals",
+      });
+    }
+
+    members.slice(-3).reverse().forEach((m) => {
+      items.push({
+        id: `member-${m.id}`,
+        type: "member",
+        color: "text-purple-300",
+        icon: Users,
+        title: `${m.fullName} is on the team`,
+        body: m.role,
+        tab: "Members",
+      });
+    });
+
+    return items.filter((n) => !dismissedNotifIds.includes(n.id));
+  }, [pendingSuggestions, upcomingRehearsal, members, dismissedNotifIds]);
+
+  // ── Browser push notifications ────────────────────────────────────────────
+  useEffect(() => {
+    if (!token) return;
+    registerPushSubscription(token);
+  }, [token]);
+
+  // Close notification panel on outside click
+  useEffect(() => {
+    if (!showNotifications) return;
+    const handleClick = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showNotifications]);
+
   // ── Nav ───────────────────────────────────────────────────────────────────
   const navItems = [
-    { name: "Dashboard", icon: LayoutDashboard, roles: ["Admin", "Musician", "Choir Member"] },
-    { name: "Song Library", icon: Music, roles: ["Admin", "Musician", "Choir Member"] },
-    { name: "Suggestions", icon: Lightbulb, roles: ["Admin", "Musician", "Choir Member"] },
-    { name: "Rehearsals", icon: CalendarDays, roles: ["Admin", "Musician", "Choir Member"] },
-    { name: "Attendance", icon: ClipboardCheck, roles: ["Admin", "Musician", "Choir Member"] },
-    { name: "Members", icon: Users, roles: ["Admin"] },
-    { name: "Settings", icon: Settings, roles: ["Admin", "Musician", "Choir Member"] },
+    { name: "Dashboard", icon: LayoutDashboard, roles: ["Music Director", "Team Member"] },
+    { name: "Song Library", icon: Music, roles: ["Music Director", "Team Member"] },
+    { name: "Suggestions", icon: Lightbulb, roles: ["Music Director", "Team Member"] },
+    { name: "Rehearsals", icon: CalendarDays, roles: ["Music Director", "Team Member"] },
+    { name: "Attendance", icon: ClipboardCheck, roles: ["Music Director", "Team Member"] },
+    { name: "Members", icon: Users, roles: ["Music Director"] },
+    { name: "Settings", icon: Settings, roles: ["Music Director", "Team Member"] },
   ];
 
   const visibleNavItems = navItems.filter((item) => item.roles.includes(currentRole));
@@ -599,6 +793,14 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
       >
         <Menu size={22} />
       </button>
+
+      {/* Sidebar backdrop overlay on mobile */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
       <div className="flex min-h-screen flex-col lg:flex-row">
         {/* ── Sidebar ──────────────────────────────────────────────────── */}
@@ -639,6 +841,26 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
             })}
           </nav>
 
+          {/* Role switcher in sidebar (mobile) */}
+          <div className="mt-8 lg:hidden">
+            <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">View As</p>
+            <div className="space-y-2">
+              {["Music Director", "Team Member"].map((role) => (
+                <button
+                  key={role}
+                  onClick={() => { switchRole(role); setSidebarOpen(false); }}
+                  className={`w-full rounded-xl px-4 py-2 text-left text-sm font-bold transition-all ${
+                    currentRole === role
+                      ? "bg-amber-400 text-slate-950"
+                      : "bg-white/5 text-slate-400 hover:bg-white/10"
+                  }`}
+                >
+                  {role}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Sidebar logout */}
           <button
             onClick={onLogout}
@@ -655,7 +877,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-300">
-                {currentRole} View
+                {isAdmin ? "Music Director View" : "Team Member View"}
               </p>
               <h1 className="mt-2 text-2xl font-black md:text-3xl">{activeTab}</h1>
             </div>
@@ -663,7 +885,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
             <div className="flex items-center gap-3">
               {/* Dev role switcher */}
               <div className="hidden items-center gap-2 sm:flex">
-                {["Admin", "Musician", "Choir Member"].map((role) => (
+                {["Music Director", "Team Member"].map((role) => (
                   <button
                     key={role}
                     onClick={() => switchRole(role)}
@@ -679,12 +901,91 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
               </div>
 
               {/* Notification bell */}
-              <div className="relative rounded-3xl border border-white/10 bg-white/5 p-3">
-                <Bell size={20} className="text-amber-300" />
-                {pendingSuggestions.length > 0 && (
-                  <span className="absolute -right-2 -top-2 rounded-full bg-red-500 px-2 text-xs font-bold">
-                    {pendingSuggestions.length}
-                  </span>
+              <div className="relative" ref={notifRef}>
+                <button
+                  onClick={() => setShowNotifications((v) => !v)}
+                  className={`relative rounded-3xl border p-3 transition-all ${
+                    showNotifications
+                      ? "border-amber-400/50 bg-amber-400/10"
+                      : "border-white/10 bg-white/5 hover:bg-white/10"
+                  }`}
+                >
+                  <Bell size={20} className="text-amber-300" />
+                  {notifications.length > 0 && (
+                    <span className="absolute -right-2 -top-2 rounded-full bg-red-500 px-2 text-xs font-bold">
+                      {notifications.length}
+                    </span>
+                  )}
+                </button>
+
+                {showNotifications && (
+                  <div className="absolute right-0 top-14 z-50 w-[calc(100vw-2rem)] max-w-80 rounded-3xl border border-white/10 bg-slate-900 shadow-2xl sm:w-80">
+                    {/* Panel header */}
+                    <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+                      <div>
+                        <p className="font-black">Notifications</p>
+                        <p className="text-xs text-slate-400">{notifications.length} unread</p>
+                      </div>
+                      {notifications.length > 0 && (
+                        <button
+                          onClick={() =>
+                            setDismissedNotifIds((prev) => [
+                              ...prev,
+                              ...notifications.map((n) => n.id),
+                            ])
+                          }
+                          className="text-xs font-bold text-slate-400 hover:text-white"
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Items */}
+                    {notifications.length === 0 ? (
+                      <div className="px-5 py-10 text-center">
+                        <Bell size={28} className="mx-auto mb-3 text-slate-600" />
+                        <p className="text-sm font-bold text-slate-400">You're all caught up!</p>
+                      </div>
+                    ) : (
+                      <div className="max-h-96 overflow-y-auto divide-y divide-white/5">
+                        {notifications.map((notif) => {
+                          const Icon = notif.icon;
+                          return (
+                            <div
+                              key={notif.id}
+                              className="flex items-start gap-3 px-5 py-4 hover:bg-white/5 transition-all"
+                            >
+                              <div className={`mt-0.5 shrink-0 ${notif.color}`}>
+                                <Icon size={18} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold leading-snug">{notif.title}</p>
+                                <p className="mt-0.5 text-xs text-slate-400">{notif.body}</p>
+                                <button
+                                  onClick={() => {
+                                    setActiveTab(notif.tab);
+                                    setShowNotifications(false);
+                                  }}
+                                  className="mt-2 text-xs font-black text-amber-300 hover:text-amber-200"
+                                >
+                                  View →
+                                </button>
+                              </div>
+                              <button
+                                onClick={() =>
+                                  setDismissedNotifIds((prev) => [...prev, notif.id])
+                                }
+                                className="shrink-0 text-slate-600 hover:text-slate-300 transition-all"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -693,65 +994,6 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
           {/* ── Dashboard Tab ──────────────────────────────────────────── */}
           {activeTab === "Dashboard" && (
             <div className="mt-8 space-y-8">
-              {/* Announcement form */}
-              {showAnnouncementForm && (
-                <div className="rounded-3xl border border-amber-400/30 bg-amber-400/10 p-5 shadow-xl">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-2xl font-black">Post Announcement</h3>
-                      <p className="mt-1 text-sm text-amber-100/80">
-                        Send an update to the worship team.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowAnnouncementForm(false)}
-                      className="rounded-xl bg-slate-950 p-2 text-slate-300 hover:text-white"
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
-                  <div className="mt-5 grid gap-4">
-                    <SongInput
-                      label="Announcement Title"
-                      value={announcementForm.title}
-                      onChange={(v) => setAnnouncementForm((p) => ({ ...p, title: v }))}
-                      placeholder="Choir rehearsal moved to 7:30 PM"
-                    />
-                    <label>
-                      <span className="text-sm font-bold text-slate-200">Message</span>
-                      <textarea
-                        value={announcementForm.message}
-                        onChange={(e) =>
-                          setAnnouncementForm((p) => ({ ...p, message: e.target.value }))
-                        }
-                        placeholder="Type announcement..."
-                        className="mt-2 min-h-28 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-amber-400"
-                      />
-                    </label>
-                    <label>
-                      <span className="text-sm font-bold text-slate-200">Audience</span>
-                      <select
-                        value={announcementForm.audience}
-                        onChange={(e) =>
-                          setAnnouncementForm((p) => ({ ...p, audience: e.target.value }))
-                        }
-                        className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none"
-                      >
-                        <option>Everyone</option>
-                        <option>Musicians</option>
-                        <option>Choir Members</option>
-                        <option>Admins Only</option>
-                      </select>
-                    </label>
-                    <button
-                      onClick={postAnnouncement}
-                      className="rounded-2xl bg-amber-400 px-5 py-3 font-black text-black"
-                    >
-                      Post Announcement
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {/* Invite Member form (dashboard shortcut) */}
               {showInviteMemberForm && (
@@ -764,16 +1006,14 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
               )}
 
               {/* Welcome banner */}
-              <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 to-amber-400/10 p-5 shadow-2xl">
+              <div className="rounded-3xl border border-amber-400/20 bg-gradient-to-br from-amber-950/60 via-slate-900 to-amber-900/30 p-5 shadow-2xl">
                 <p className="text-xs font-bold uppercase tracking-[0.3em] text-amber-300">
                   Welcome Back
                 </p>
                 <h2 className="mt-3 text-3xl font-black">
                   {isAdmin
-                    ? "Choir Director Command Center 🎵"
-                    : isMusician
-                    ? "Musician Dashboard 🎸"
-                    : "Choir Member Dashboard 🎶"}
+                    ? "Music Director Command Center 🎵"
+                    : "Team Member Dashboard 🎶"}
                 </h2>
                 <p className="mt-3 max-w-2xl text-slate-300">
                   {isAdmin
@@ -806,18 +1046,87 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                     <QuickButton
                       icon={Megaphone}
                       label="Post Announcement"
-                      onClick={() => setShowAnnouncementForm(true)}
+                      onClick={() => {
+                        const el = document.getElementById("announcement-form");
+                        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }}
                     />
                   </div>
                 )}
               </div>
 
               {/* Stat cards */}
-              <div className="grid gap-5 md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-5 md:grid-cols-4">
                 <StatCard title="Songs in Library" value={songs.length} />
                 <StatCard title="Rehearsals" value={rehearsals.length} />
                 <StatCard title="Song Suggestions" value={songSuggestions.length} />
                 <StatCard title="Pending Review" value={pendingSuggestions.length} />
+              </div>
+
+              {/* Announcements */}
+              <div className="space-y-4">
+                {isAdmin && (
+                  <div id="announcement-form" className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl">
+                    <h3 className="text-xl font-black">Post Announcement</h3>
+                    <p className="mt-1 text-sm text-slate-400">Visible to all team members in their notification bell.</p>
+                    {announcementMsg && (
+                      <p className={`mt-3 rounded-2xl px-4 py-3 text-sm font-bold ${
+                        announcementMsg.includes("posted") ? "bg-emerald-500/20 text-emerald-200" : "bg-red-500/20 text-red-200"
+                      }`}>{announcementMsg}</p>
+                    )}
+                    <div className="mt-4 space-y-3">
+                      <input
+                        value={announcementForm.title}
+                        onChange={(e) => setAnnouncementFormState((p) => ({ ...p, title: e.target.value }))}
+                        placeholder="Announcement title..."
+                        className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-amber-400"
+                      />
+                      <textarea
+                        value={announcementForm.body}
+                        onChange={(e) => setAnnouncementFormState((p) => ({ ...p, body: e.target.value }))}
+                        placeholder="Details (optional)..."
+                        rows={3}
+                        className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-amber-400 resize-none"
+                      />
+                      <button
+                        onClick={postAnnouncement}
+                        disabled={announcementLoading}
+                        className="rounded-2xl bg-amber-400 px-6 py-3 font-black text-slate-950 transition-all hover:scale-[1.02] disabled:opacity-60"
+                      >
+                        {announcementLoading ? "Posting…" : "Post Announcement"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {announcements.length > 0 && (
+                  <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl">
+                    <h3 className="text-xl font-black">Announcements</h3>
+                    <div className="mt-4 space-y-3">
+                      {announcements.map((a) => (
+                        <div key={a.id} className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-black text-emerald-300">{a.title}</p>
+                              {a.body && <p className="mt-1 text-sm text-slate-300">{a.body}</p>}
+                              <p className="mt-2 text-xs text-slate-500">
+                                Posted by {a.createdBy} · {new Date(a.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                              </p>
+                            </div>
+                            {isAdmin && (
+                              <button
+                                onClick={() => deleteAnnouncement(a.id)}
+                                className="rounded-xl bg-red-500/20 px-3 py-1 text-xs font-bold text-red-300 hover:bg-red-500/30"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Main dashboard cards */}
@@ -1222,7 +1531,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                       />
                       <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950 px-4 py-3">
                         <span className="text-sm text-slate-400">Suggested by:</span>
-                        <span className="font-black text-amber-300">{currentUser?.fullName}</span>
+                        <span className="font-black text-amber-300">{currentUser?.fullName || currentUser?.email?.split("@")[0] || "You"}</span>
                       </div>
                       <label className="lg:col-span-2">
                         <span className="text-sm font-bold text-slate-200">Why this song?</span>
@@ -1576,6 +1885,8 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
           {/* ── Attendance Tab ──────────────────────────────────────────── */}
           {activeTab === "Attendance" && (
             <div className="mt-8 space-y-6">
+
+              {/* Header */}
               <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 to-slate-900 p-5 shadow-xl">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
@@ -1584,7 +1895,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                     </p>
                     <h2 className="mt-2 text-3xl font-black">Attendance</h2>
                     <p className="mt-2 text-sm text-slate-300">
-                      Confirmations save to your database and stay after refresh.
+                      RSVP for rehearsals — confirmations save instantly.
                     </p>
                   </div>
                   <button
@@ -1592,111 +1903,204 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                     className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white/10 px-5 py-3 font-black text-slate-200 transition-all hover:scale-[1.03] hover:bg-white/15"
                   >
                     <Clock size={18} />
-                    Refresh Status
+                    Refresh
                   </button>
                 </div>
               </div>
 
-              <div className="grid gap-5 md:grid-cols-3">
-                <div className="rounded-3xl border border-white/10 bg-emerald-500/10 p-5">
-                  <p className="text-4xl font-black text-emerald-300">{confirmedCount}</p>
-                  <p className="mt-2 text-emerald-100">Confirmed</p>
-                </div>
-                <div className="rounded-3xl border border-white/10 bg-amber-400/10 p-5">
-                  <p className="text-4xl font-black text-amber-300">{pendingCount}</p>
-                  <p className="mt-2 text-amber-100">Pending</p>
-                </div>
-                <div className="rounded-3xl border border-white/10 bg-red-500/10 p-5">
-                  <p className="text-4xl font-black text-red-300">{declinedCount}</p>
-                  <p className="mt-2 text-red-100">Declined</p>
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-xl">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <h3 className="text-2xl font-black">
-                      {upcomingRehearsal?.title || "Upcoming Rehearsal Team"}
-                    </h3>
-                    <p className="mt-1 text-sm text-slate-400">
-                      {upcomingRehearsal
-                        ? `${upcomingRehearsal.location} • ${formatTime(upcomingRehearsal.eventTime)}`
-                        : "Create a rehearsal first"}
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-emerald-500/20 px-4 py-2 text-xs font-bold text-emerald-300">
-                    Database Live
-                  </span>
-                </div>
-
-                {upcomingSongs.length > 0 && (
-                  <div className="mt-6 rounded-3xl border border-white/10 bg-slate-950 p-4">
-                    <div className="mb-3 flex items-center gap-2">
-                      <ListMusic size={18} className="text-amber-300" />
-                      <p className="font-black">Upcoming Setlist</p>
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {upcomingSongs.map((song) => (
-                        <div key={song.id} className="rounded-2xl bg-white/5 px-4 py-3">
-                          <p className="font-bold">{song.title}</p>
-                          <p className="mt-1 text-xs text-slate-400">Key {song.key || "N/A"}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-6 space-y-4">
-                  {upcomingAttendance.length > 0 ? (
-                    upcomingAttendance.map((member) => (
-                      <div
-                        key={member.id}
-                        className="flex flex-col gap-4 rounded-2xl bg-slate-950 p-4 md:flex-row md:items-center md:justify-between"
-                      >
-                        <div>
-                          <h4 className="text-lg font-black">{member.memberName}</h4>
-                          <p className="text-sm text-slate-400">{member.role}</p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3">
-                          <span
-                            className={`rounded-full px-4 py-2 text-xs font-bold ${
-                              member.status === "Confirmed"
-                                ? "bg-emerald-500/20 text-emerald-300"
-                                : member.status === "Declined"
-                                ? "bg-red-500/20 text-red-300"
-                                : "bg-amber-400/20 text-amber-300"
-                            }`}
-                          >
-                            {member.status}
+              {/* Rehearsal picker */}
+              {rehearsals.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {rehearsals
+                    .slice()
+                    .sort((a, b) => new Date(a.eventDate) - new Date(b.eventDate))
+                    .map((r) => {
+                      const isSelected = r.id === selectedAttendanceId;
+                      const isPast = new Date(r.eventDate) < new Date();
+                      return (
+                        <button
+                          key={r.id}
+                          onClick={() => setAttendanceRehearsalId(r.id)}
+                          className={`rounded-2xl border px-4 py-2 text-sm font-bold transition-all hover:scale-[1.02] ${
+                            isSelected
+                              ? "border-amber-400 bg-amber-400 text-slate-950"
+                              : isPast
+                              ? "border-white/10 bg-white/5 text-slate-500"
+                              : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+                          }`}
+                        >
+                          {r.title}
+                          <span className="ml-2 text-xs font-normal opacity-70">
+                            {formatRehearsalDate(r.eventDate)}
                           </span>
-                          <button
-                            onClick={() => updateAttendanceStatus(member.id, "Confirmed")}
-                            className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-slate-950"
-                          >
-                            Confirm
-                          </button>
-                          <button
-                            onClick={() => updateAttendanceStatus(member.id, "Pending")}
-                            className="rounded-xl bg-amber-400 px-4 py-2 text-sm font-bold text-slate-950"
-                          >
-                            Pending
-                          </button>
-                          <button
-                            onClick={() => updateAttendanceStatus(member.id, "Declined")}
-                            className="rounded-xl bg-red-500 px-4 py-2 text-sm font-bold text-white"
-                          >
-                            Decline
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="rounded-2xl bg-slate-950 p-4 text-slate-400">
-                      Loading attendance records...
-                    </p>
-                  )}
+                        </button>
+                      );
+                    })}
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center">
+                  <CalendarDays size={40} className="mx-auto text-slate-600" />
+                  <p className="mt-4 font-bold text-slate-300">No rehearsals yet. Create one in the Rehearsals tab first.</p>
+                </div>
+              )}
+
+              {selectedAttendanceRehearsal && (
+                <>
+                  {/* Stats row */}
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-5">
+                      <p className="text-4xl font-black text-emerald-300">{selConfirmed}</p>
+                      <p className="mt-2 text-sm font-bold text-emerald-100">Confirmed</p>
+                    </div>
+                    <div className="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-5">
+                      <p className="text-4xl font-black text-amber-300">{selPending}</p>
+                      <p className="mt-2 text-sm font-bold text-amber-100">Pending</p>
+                    </div>
+                    <div className="rounded-3xl border border-red-500/20 bg-red-500/10 p-5">
+                      <p className="text-4xl font-black text-red-300">{selDeclined}</p>
+                      <p className="mt-2 text-sm font-bold text-red-100">Declined</p>
+                    </div>
+                  </div>
+
+                  {/* Personal RSVP card */}
+                  {myRecord ? (
+                    <div className={`rounded-3xl border-2 p-6 shadow-xl ${
+                      myRecord.status === "Confirmed"
+                        ? "border-emerald-500/40 bg-emerald-500/10"
+                        : myRecord.status === "Declined"
+                        ? "border-red-500/40 bg-red-500/10"
+                        : "border-amber-400/40 bg-amber-400/10"
+                    }`}>
+                      <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Your RSVP</p>
+                      <h3 className="mt-2 text-2xl font-black">
+                        {selectedAttendanceRehearsal.title}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-400">
+                        {formatRehearsalDate(selectedAttendanceRehearsal.eventDate)} · {formatTime(selectedAttendanceRehearsal.eventTime)}
+                        {selectedAttendanceRehearsal.location && ` · ${selectedAttendanceRehearsal.location}`}
+                      </p>
+                      <div className="mt-5 flex flex-wrap gap-3">
+                        <button
+                          onClick={() => updateAttendanceStatus(myRecord.id, "Confirmed")}
+                          className={`flex items-center gap-2 rounded-2xl px-6 py-3 font-black transition-all hover:scale-[1.02] ${
+                            myRecord.status === "Confirmed"
+                              ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/30"
+                              : "bg-white/10 text-slate-200 hover:bg-emerald-500/20 hover:text-emerald-200"
+                          }`}
+                        >
+                          <CheckCircle size={18} />
+                          I'll be there
+                        </button>
+                        <button
+                          onClick={() => updateAttendanceStatus(myRecord.id, "Declined")}
+                          className={`flex items-center gap-2 rounded-2xl px-6 py-3 font-black transition-all hover:scale-[1.02] ${
+                            myRecord.status === "Declined"
+                              ? "bg-red-500 text-white shadow-lg shadow-red-500/30"
+                              : "bg-white/10 text-slate-200 hover:bg-red-500/20 hover:text-red-200"
+                          }`}
+                        >
+                          <XCircle size={18} />
+                          Can't make it
+                        </button>
+                      </div>
+                      <p className="mt-4 text-xs text-slate-500">
+                        Current status: <span className={`font-bold ${
+                          myRecord.status === "Confirmed" ? "text-emerald-300"
+                          : myRecord.status === "Declined" ? "text-red-300"
+                          : "text-amber-300"
+                        }`}>{myRecord.status}</span>
+                      </p>
+                    </div>
+                  ) : selectedAttendance.length > 0 ? (
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+                      <p className="text-sm text-slate-400">
+                        No RSVP record found for your account on this rehearsal. Ask your Admin to refresh the attendance list.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {/* Team list */}
+                  <div className="rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-xl">
+                    <h3 className="text-xl font-black">Team Status</h3>
+                    <p className="mt-1 text-sm text-slate-400">{selectedAttendanceRehearsal.title}</p>
+
+                    <div className="mt-5 space-y-3">
+                      {selectedAttendance.length > 0 ? (
+                        selectedAttendance.map((record) => {
+                          const isMe = record.memberName === (currentUser?.fullName || currentUser?.email?.split("@")[0]);
+                          return (
+                            <div
+                              key={record.id}
+                              className={`flex flex-col gap-3 rounded-2xl p-4 md:flex-row md:items-center md:justify-between ${
+                                isMe ? "border border-amber-400/30 bg-amber-400/5" : "bg-slate-950"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-sm font-black">
+                                  {record.memberName?.[0]?.toUpperCase() ?? "?"}
+                                </div>
+                                <div>
+                                  <p className="font-black">
+                                    {record.memberName}
+                                    {isMe && <span className="ml-2 text-xs font-bold text-amber-300">(you)</span>}
+                                  </p>
+                                  <p className="text-xs text-slate-400">{record.role}</p>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+                                  record.status === "Confirmed" ? "bg-emerald-500/20 text-emerald-300"
+                                  : record.status === "Declined" ? "bg-red-500/20 text-red-300"
+                                  : "bg-amber-400/20 text-amber-300"
+                                }`}>
+                                  {record.status}
+                                </span>
+                                {/* Admins can override anyone's status */}
+                                {isAdmin && (
+                                  <>
+                                    <button
+                                      onClick={() => updateAttendanceStatus(record.id, "Confirmed")}
+                                      className="rounded-xl bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-300 hover:bg-emerald-500/40"
+                                    >
+                                      ✓
+                                    </button>
+                                    <button
+                                      onClick={() => updateAttendanceStatus(record.id, "Pending")}
+                                      className="rounded-xl bg-amber-400/20 px-3 py-1 text-xs font-bold text-amber-300 hover:bg-amber-400/40"
+                                    >
+                                      ?
+                                    </button>
+                                    <button
+                                      onClick={() => updateAttendanceStatus(record.id, "Declined")}
+                                      className="rounded-xl bg-red-500/20 px-3 py-1 text-xs font-bold text-red-300 hover:bg-red-500/40"
+                                    >
+                                      ✕
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <p className="rounded-2xl bg-slate-950 p-4 text-sm text-slate-400">
+                          Loading team attendance…
+                        </p>
+                      )}
+                    </div>
+
+                    {isAdmin && selectedAttendance.length === 0 && (
+                      <button
+                        onClick={() => seedAttendanceRecords(selectedAttendanceId)}
+                        className="mt-5 rounded-2xl bg-amber-400 px-5 py-3 font-black text-slate-950 transition-all hover:scale-[1.02]"
+                      >
+                        Generate Attendance Records
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -1751,7 +2155,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                       />
                     </div>
                     <div className="flex gap-2">
-                      {["All", "Admin", "Musician", "Choir Member"].map((role) => (
+                      {["All", "Music Director", "Team Member"].map((role) => (
                         <button
                           key={role}
                           onClick={() => setMemberRoleFilter(role)}
@@ -1813,7 +2217,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                               Change Role
                             </p>
                             <div className="flex flex-wrap gap-2">
-                              {["Admin", "Musician", "Choir Member"].map((role) => (
+                              {["Music Director", "Team Member"].map((role) => (
                                 <button
                                   key={role}
                                   onClick={() => {
@@ -1869,7 +2273,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                       Your Account
                     </p>
                     <h2 className="mt-1 text-2xl font-black">
-                      {currentUser?.fullName || "User"}
+                      {currentUser?.fullName || currentUser?.email?.split("@")[0] || "User"}
                     </h2>
                     <p className="mt-1 text-sm text-slate-400">{currentUser?.email}</p>
                   </div>
@@ -1890,6 +2294,71 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                 </div>
               </div>
 
+              {/* Update name */}
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl">
+                <h3 className="text-2xl font-black">Update Name</h3>
+                <p className="mt-2 text-sm text-slate-400">
+                  Change the name shown across your dashboard.
+                </p>
+                {nameMsg && (
+                  <p className="mt-4 rounded-2xl bg-emerald-500/20 px-4 py-3 text-sm font-bold text-emerald-200">
+                    {nameMsg}
+                  </p>
+                )}
+                {nameError && (
+                  <p className="mt-4 rounded-2xl bg-red-500/20 px-4 py-3 text-sm font-bold text-red-200">
+                    {nameError}
+                  </p>
+                )}
+                <div className="mt-6 flex max-w-md gap-3">
+                  <input
+                    value={nameValue}
+                    onChange={(e) => setNameValue(e.target.value)}
+                    placeholder="Your full name"
+                    className="flex-1 rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-amber-400"
+                  />
+                  <button
+                    disabled={nameLoading}
+                    onClick={async () => {
+                      setNameMsg("");
+                      setNameError("");
+                      if (!nameValue.trim()) {
+                        setNameError("Name cannot be empty.");
+                        return;
+                      }
+                      setNameLoading(true);
+                      try {
+                        const res = await fetch(`${API_BASE}/api/Auth/update-name`, {
+                          method: "PUT",
+                          headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${token}`,
+                          },
+                          body: JSON.stringify({ fullName: nameValue.trim() }),
+                        });
+                        const data = await res.json();
+                        if (!res.ok) {
+                          setNameError(data.message || data || "Failed to update name.");
+                        } else {
+                          setNameMsg("Name updated successfully!");
+                          const updatedUser = { ...currentUser, fullName: nameValue.trim() };
+                          localStorage.setItem("rehearsalRoomUser", JSON.stringify(updatedUser));
+                          // Reload page to sync name everywhere
+                          window.location.reload();
+                        }
+                      } catch {
+                        setNameError("Could not reach the server.");
+                      } finally {
+                        setNameLoading(false);
+                      }
+                    }}
+                    className="rounded-2xl bg-amber-400 px-5 py-3 font-black text-slate-950 transition-all hover:scale-[1.02] disabled:opacity-60"
+                  >
+                    {nameLoading ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              </div>
+
               {/* Change password */}
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl">
                 <h3 className="text-2xl font-black">Change Password</h3>
@@ -1899,6 +2368,11 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                 {passwordMsg && (
                   <p className="mt-4 rounded-2xl bg-emerald-500/20 px-4 py-3 text-sm font-bold text-emerald-200">
                     {passwordMsg}
+                  </p>
+                )}
+                {passwordError && (
+                  <p className="mt-4 rounded-2xl bg-red-500/20 px-4 py-3 text-sm font-bold text-red-200">
+                    {passwordError}
                   </p>
                 )}
                 <div className="mt-6 grid gap-4 max-w-md">
@@ -1939,19 +2413,50 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                     />
                   </label>
                   <button
-                    onClick={() => {
-                      if (!passwordForm.newPassword) return;
-                      if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-                        setPasswordMsg("Passwords do not match.");
+                    disabled={passwordLoading}
+                    onClick={async () => {
+                      setPasswordMsg("");
+                      setPasswordError("");
+                      if (!passwordForm.currentPassword || !passwordForm.newPassword) {
+                        setPasswordError("Please fill in all fields.");
                         return;
                       }
-                      // TODO: wire up to PUT /api/Auth/change-password when endpoint is ready
-                      setPasswordMsg("Password change saved! (Backend endpoint coming soon.)");
-                      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+                      if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+                        setPasswordError("New passwords do not match.");
+                        return;
+                      }
+                      if (passwordForm.newPassword.length < 8) {
+                        setPasswordError("New password must be at least 8 characters.");
+                        return;
+                      }
+                      setPasswordLoading(true);
+                      try {
+                        const res = await fetch(`${API_BASE}/api/Auth/change-password`, {
+                          method: "PUT",
+                          headers: authHeaders,
+                          body: JSON.stringify({
+                            currentPassword: passwordForm.currentPassword,
+                            newPassword: passwordForm.newPassword,
+                          }),
+                        });
+                        const data = await res.json();
+                        if (!res.ok) {
+                          setPasswordError(
+                            typeof data === "string" ? data : data.message || "Could not update password."
+                          );
+                        } else {
+                          setPasswordMsg("Password updated successfully!");
+                          setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+                        }
+                      } catch {
+                        setPasswordError("Could not reach the server. Is the backend running?");
+                      } finally {
+                        setPasswordLoading(false);
+                      }
                     }}
-                    className="rounded-2xl bg-amber-400 px-5 py-3 font-black text-slate-950 transition-all hover:scale-[1.02]"
+                    className="rounded-2xl bg-amber-400 px-5 py-3 font-black text-slate-950 transition-all hover:scale-[1.02] disabled:opacity-60"
                   >
-                    Update Password
+                    {passwordLoading ? "Updating…" : "Update Password"}
                   </button>
                 </div>
               </div>
@@ -1989,86 +2494,113 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
           )}
         </section>
       </div>
+
+      {/* ── Mobile bottom navigation bar ─────────────────────────────── */}
+      <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-white/10 bg-slate-950/95 backdrop-blur lg:hidden">
+        <div className="flex items-center justify-around px-1 py-2">
+          {visibleNavItems.slice(0, 5).map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.name;
+            return (
+              <button
+                key={item.name}
+                onClick={() => setActiveTab(item.name)}
+                className={`flex flex-col items-center gap-1 rounded-xl px-3 py-2 transition-all ${
+                  isActive ? "text-amber-400" : "text-slate-500"
+                }`}
+              >
+                <Icon size={22} />
+                <span className="text-[10px] font-bold leading-none">
+                  {item.name.split(" ")[0]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </main>
   );
 }
 
-// ── Reusable sub-components ───────────────────────────────────────────────────
+// ── Push notification registration ───────────────────────────────────────────────
+async function registerPushSubscription(token) {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
-function InviteMemberForm({ form, setForm, onSave, onClose }) {
-  return (
-    <div className="rounded-3xl border border-blue-400/30 bg-blue-400/10 p-5 shadow-xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-2xl font-black">Invite Member</h3>
-          <p className="mt-1 text-sm text-blue-100/80">Invite a new worship team member.</p>
-        </div>
-        <button
-          onClick={onClose}
-          className="rounded-xl bg-slate-950 p-2 text-slate-300 hover:text-white"
-        >
-          <X size={20} />
-        </button>
-      </div>
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
-        <SongInput
-          label="Full Name"
-          value={form.fullName}
-          onChange={(v) => setForm((p) => ({ ...p, fullName: v }))}
-          placeholder="John Smith"
-        />
-        <SongInput
-          label="Email"
-          value={form.email}
-          onChange={(v) => setForm((p) => ({ ...p, email: v }))}
-          placeholder="john@example.com"
-        />
-        <label className="md:col-span-2">
-          <span className="text-sm font-bold text-slate-200">Role</span>
-          <select
-            value={form.role}
-            onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
-            className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-blue-400"
-          >
-            <option value="Choir Member">Choir Member</option>
-            <option value="Musician">Musician</option>
-            <option value="Admin">Admin</option>
-          </select>
-        </label>
-      </div>
-      <button
-        onClick={onSave}
-        className="mt-6 rounded-2xl bg-blue-400 px-5 py-3 font-black text-slate-950"
-      >
-        Send Invite
-      </button>
-    </div>
-  );
+    const reg = await navigator.serviceWorker.register('/sw.js');
+
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+
+    const keyRes = await fetch(`${API_BASE}/api/Push/vapid-public-key`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!keyRes.ok) return;
+    const { publicKey } = await keyRes.json();
+
+    const subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+
+    const { endpoint, keys } = subscription.toJSON();
+
+    await fetch(`${API_BASE}/api/Push/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ endpoint, p256dh: keys.p256dh, auth: keys.auth }),
+    });
+  } catch (err) {
+    console.warn('[Push] Registration failed:', err);
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+// ── Reusable sub-components ───────────────────────────────────────────────────────
+
+
+// ── Helper components ────────────────────────────────────────────────────────
+
+function formatRehearsalDate(value) {
+  if (!value) return "Date not set";
+  const dateOnly = typeof value === "string" ? value.split("T")[0] : value;
+  const date = new Date(dateOnly + "T12:00:00");
+  if (isNaN(date.getTime())) return "Date not set";
+  return date.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+}
+
+function formatTime(value) {
+  if (!value) return "Time not set";
+  const timePart = value.includes("T") ? value.split("T")[1] : value;
+  const parts = timePart.split(":");
+  if (parts.length < 2) return "Time not set";
+  const date = new Date();
+  date.setHours(Number(parts[0]));
+  date.setMinutes(Number(parts[1]));
+  if (isNaN(date.getTime())) return "Time not set";
+  return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
 function StatCard({ title, value }) {
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-xl transition-all hover:-translate-y-1 hover:bg-white/10">
-      <h2 className="text-3xl font-black text-white">{value}</h2>
-      <p className="mt-2 text-slate-300">{title}</p>
-    </div>
-  );
-}
-
-function DashboardCard({ title, children }) {
-  return (
-    <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-xl">
-      <h2 className="text-2xl font-bold">{title}</h2>
-      <div className="mt-5">{children}</div>
+    <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl">
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{title}</p>
+      <p className="mt-3 text-4xl font-black text-white">{value ?? 0}</p>
     </div>
   );
 }
 
 function MiniStat({ label, value }) {
   return (
-    <div className="rounded-2xl bg-slate-900 p-4">
-      <p className="text-2xl font-black">{value}</p>
-      <p className="text-sm text-slate-400">{label}</p>
+    <div className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-center">
+      <p className="text-2xl font-black text-white">{value ?? 0}</p>
+      <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
     </div>
   );
 }
@@ -2077,114 +2609,114 @@ function QuickButton({ icon: Icon, label, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-2 rounded-2xl bg-amber-400 px-4 py-2.5 font-bold text-slate-950 transition-all hover:scale-[1.03]"
+      className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-slate-200 transition-all hover:bg-white/10 hover:scale-[1.02]"
     >
-      <Icon size={18} />
+      <Icon size={15} />
       {label}
     </button>
   );
 }
 
-function StatusBadge({ status }) {
-  const styles =
-    status === "Approved"
-      ? "bg-emerald-500/20 text-emerald-300"
-      : status === "Rejected"
-      ? "bg-red-500/20 text-red-300"
-      : "bg-amber-400/20 text-amber-300";
-  return (
-    <span className={`rounded-full px-4 py-2 text-xs font-bold ${styles}`}>{status}</span>
-  );
-}
-
-function SongInput({ label, value, onChange, placeholder }) {
+function SongInput({ label, value, onChange, placeholder, type = "text" }) {
   return (
     <label>
       <span className="text-sm font-bold text-slate-200">{label}</span>
       <input
+        type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-amber-400"
+        className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-amber-400"
       />
     </label>
   );
 }
 
+function FilterSelect({ value, onChange, children }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-2 text-sm text-white outline-none focus:border-amber-400"
+    >
+      {children}
+    </select>
+  );
+}
+
 function SongPill({ label }) {
   return (
-    <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-slate-300">
+    <span className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300">
       {label}
     </span>
   );
 }
 
-function FilterSelect({ icon: Icon, value, onChange, options, label }) {
+function StatusBadge({ status }) {
+  const styles = {
+    Pending:  "bg-amber-500/20 text-amber-200",
+    Approved: "bg-emerald-500/20 text-emerald-200",
+    Rejected: "bg-red-500/20 text-red-300",
+  };
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-slate-950 px-4 py-3">
-      <Icon size={18} className="text-slate-400" />
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-transparent text-sm font-bold text-white outline-none"
-      >
-        {options.map((option) => (
-          <option key={option} value={option} className="bg-slate-950">
-            {label}: {option}
-          </option>
-        ))}
-      </select>
+    <span className={`rounded-full px-3 py-1 text-xs font-black ${styles[status] ?? "bg-slate-700 text-slate-300"}`}>
+      {status ?? "Unknown"}
+    </span>
+  );
+}
+
+function DashboardCard({ title, children }) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl">
+      <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">{title}</h3>
+      <div className="mt-4">{children}</div>
     </div>
   );
 }
 
-function getInitials(name = "") {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((n) => n[0].toUpperCase())
-    .join("");
-}
-
-function roleAvatarBg(role) {
-  if (role === "Admin") return "bg-amber-400 text-slate-950";
-  if (role === "Musician") return "bg-blue-500 text-white";
-  return "bg-purple-500 text-white";
-}
-
-function roleBadgeStyle(role) {
-  if (role === "Admin") return "bg-amber-400/20 text-amber-300";
-  if (role === "Musician") return "bg-blue-500/20 text-blue-300";
-  return "bg-purple-500/20 text-purple-300";
-}
-
-function rolePillActive(role) {
-  if (role === "Admin") return "bg-amber-400 text-slate-950";
-  if (role === "Musician") return "bg-blue-500 text-white";
-  if (role === "Choir Member") return "bg-purple-500 text-white";
-  return "bg-white/20 text-white";
-}
-
-function getTodayDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function formatRehearsalDate(value) {
-  if (!value) return "Date not set";
-  const date = new Date(`${value}T12:00:00`);
-  return date.toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function formatTime(value) {
-  if (!value) return "Time not set";
-  const [hours, minutes] = value.split(":");
-  const date = new Date();
-  date.setHours(Number(hours));
-  date.setMinutes(Number(minutes));
-  return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+function InviteMemberForm({ form, setForm, onSave, onClose }) {
+  const inp = "mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-amber-400";
+  return (
+    <div className="rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-xl">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-black">Add Member</h3>
+        <button onClick={onClose} className="rounded-xl bg-white/10 px-3 py-1 text-sm font-bold text-slate-300 hover:bg-white/20">
+          Cancel
+        </button>
+      </div>
+      <p className="mt-2 text-sm text-slate-400">A login account will be created so they can sign in immediately.</p>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <label>
+          <span className="text-sm font-bold text-slate-300">Full Name</span>
+          <input value={form.fullName} onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))} placeholder="Jane Smith" className={inp} />
+        </label>
+        <label>
+          <span className="text-sm font-bold text-slate-300">Email</span>
+          <input type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} placeholder="jane@worship.com" className={inp} />
+        </label>
+        <label>
+          <span className="text-sm font-bold text-slate-300">Password</span>
+          <input type="password" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} placeholder="Min 8 characters" className={inp} />
+        </label>
+        <label>
+          <span className="text-sm font-bold text-slate-300">Role</span>
+          <select value={form.role} onChange={(e) => setForm((p) => ({ ...p, role: e.target.value, directorCode: "" }))}
+            className={inp}>
+            <option>Team Member</option>
+            <option>Music Director</option>
+          </select>
+        </label>
+        {form.role === "Music Director" && (
+          <label className="md:col-span-2">
+            <span className="text-sm font-bold text-slate-300">Director Code</span>
+            <input value={form.directorCode} onChange={(e) => setForm((p) => ({ ...p, directorCode: e.target.value }))} placeholder="Required to grant Music Director role" className={inp} />
+          </label>
+        )}
+      </div>
+      <button onClick={onSave}
+        className="mt-5 rounded-2xl bg-amber-400 px-6 py-3 font-black text-slate-950 transition-all hover:scale-[1.02]">
+        Add Member
+      </button>
+    </div>
+  );
 }

@@ -6,9 +6,14 @@ using RehearsalRoomAPI.Models;
 
 namespace RehearsalRoomAPI.Controllers
 {
+    /// <summary>
+    /// Members are backed by the Users table so that login and membership
+    /// are always in sync.  The add-member flow uses Auth/register so
+    /// passwords are hashed and the new user can immediately log in.
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize] // All endpoints require a valid login
+    [Authorize]
     public class MembersController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -20,58 +25,54 @@ namespace RehearsalRoomAPI.Controllers
 
         // Any logged-in user can view the members list
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Member>>> GetMembers()
+        public async Task<ActionResult<IEnumerable<object>>> GetMembers()
         {
-            return await _context.Members.ToListAsync();
+            var users = await _context.Users
+                .OrderBy(u => u.FullName)
+                .Select(u => new
+                {
+                    id = u.Id,
+                    fullName = u.FullName,
+                    email = u.Email,
+                    role = u.Role,
+                    createdAt = u.CreatedAt
+                })
+                .ToListAsync();
+
+            return Ok(users);
         }
 
-        // Only Admins can add members
-        [HttpPost]
-        [Authorize(Roles = "Admin")]
-        public async Task<ActionResult<Member>> CreateMember(Member member)
-        {
-            _context.Members.Add(member);
-            await _context.SaveChangesAsync();
-            return Ok(member);
-        }
-
-        // Only Admins can update members
+        // Only Music Directors can change a member's role
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin")]
-        public async Task<ActionResult<Member>> UpdateMember(int id, Member updatedMember)
+        [Authorize(Roles = "Music Director")]
+        public async Task<IActionResult> UpdateMemberRole(int id, [FromBody] UpdateMemberRoleDto dto)
         {
-            var member = await _context.Members.FindAsync(id);
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound();
 
-            if (member == null)
-            {
-                return NotFound();
-            }
-
-            member.FullName = updatedMember.FullName;
-            member.Email = updatedMember.Email;
-            member.Role = updatedMember.Role;
-
+            user.Role = dto.Role;
             await _context.SaveChangesAsync();
 
-            return Ok(member);
+            return Ok(new { id = user.Id, fullName = user.FullName, email = user.Email, role = user.Role });
         }
 
-        // Only Admins can delete members
+        // Only Music Directors can remove a member (deletes their account)
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Music Director")]
         public async Task<IActionResult> DeleteMember(int id)
         {
-            var member = await _context.Members.FindAsync(id);
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound();
 
-            if (member == null)
-            {
-                return NotFound();
-            }
-
-            _context.Members.Remove(member);
+            _context.Users.Remove(user);
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
+    }
+
+    public class UpdateMemberRoleDto
+    {
+        public string Role { get; set; } = "Team Member";
     }
 }

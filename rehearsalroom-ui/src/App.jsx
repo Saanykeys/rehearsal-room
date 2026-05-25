@@ -3,7 +3,7 @@ import rehearsalLogo from "./assets/rehearsalroom-logo.png";
 import AdminDashboard from "./components/AdminDashboard";
 import LandingPage from "./pages/LandingPage";
 
-const API_BASE = import.meta.env.VITE_API_BASE;
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5281";
 
 export default function App() {
   const [showAuth, setShowAuth] = useState(false);
@@ -23,11 +23,10 @@ export default function App() {
 
   const [authForm, setAuthForm] = useState({
     fullName: "",
-    email: "admin@rehearsalroom.com",
-    password: "Password123!",
-    role: "Admin",
+    email: "",
+    password: "",
+    directorCode: "",
   });
-
   const isLoggedIn = currentUser && token;
 
   const handleAuthSubmit = async (event) => {
@@ -47,7 +46,7 @@ export default function App() {
             fullName: authForm.fullName,
             email: authForm.email,
             password: authForm.password,
-            role: authForm.role,
+            directorCode: authForm.directorCode,
           };
 
     try {
@@ -59,13 +58,16 @@ export default function App() {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      // Backend sometimes returns plain text errors, sometimes JSON
+      const text = await response.text();
+      let data = null;
+      try { data = JSON.parse(text); } catch { data = text; }
 
       if (!response.ok) {
         setAuthError(
           typeof data === "string"
             ? data
-            : data.message || "Authentication failed."
+            : data?.message || "Authentication failed."
         );
         return;
       }
@@ -124,29 +126,8 @@ export default function App() {
       />
     );
   }
-const getSongsForRehearsal = (rehearsal) => {
-  if (!rehearsal?.songIds || rehearsal.songIds.length === 0) {
-    return [];
-  }
-
-  return songs.filter((song) => rehearsal.songIds.includes(song.id));
-};
   return (
     <div className="min-h-screen bg-slate-950">
-      <div className="fixed right-5 top-5 z-[60] flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/90 px-4 py-3 text-white shadow-xl backdrop-blur">
-        <div className="hidden text-right sm:block">
-          <p className="text-sm font-black">{currentUser.fullName}</p>
-          <p className="text-xs text-slate-400">{currentUser.role}</p>
-        </div>
-
-        <button
-          onClick={logout}
-          className="rounded-xl bg-red-500/20 px-4 py-2 text-sm font-black text-red-200 hover:bg-red-500/30"
-        >
-          Logout
-        </button>
-      </div>
-
       <AdminDashboard currentUser={currentUser} token={token} onLogout={logout} />
     </div>
   );
@@ -163,6 +144,7 @@ function AuthScreen({
   handleAuthSubmit,
   onBack,
 }) {
+  const [showDirectorCode, setShowDirectorCode] = useState(false);
   const isLogin = authMode === "login";
 
   return (
@@ -232,14 +214,16 @@ function AuthScreen({
 
           <div className="mt-6 space-y-4">
             {!isLogin && (
-              <AuthInput
-                label="Full Name"
-                value={authForm.fullName}
-                onChange={(value) =>
-                  setAuthForm((prev) => ({ ...prev, fullName: value }))
-                }
-                placeholder="Rahsaan Hall"
-              />
+              <>
+                <AuthInput
+                  label="Full Name"
+                  value={authForm.fullName}
+                  onChange={(value) =>
+                    setAuthForm((prev) => ({ ...prev, fullName: value }))
+                  }
+                  placeholder="Your full name"
+                />
+              </>
             )}
 
             <AuthInput
@@ -263,23 +247,30 @@ function AuthScreen({
             />
 
             {!isLogin && (
-              <label>
-                <span className="text-sm font-bold text-slate-200">Role</span>
-                <select
-                  value={authForm.role}
-                  onChange={(event) =>
-                    setAuthForm((prev) => ({
-                      ...prev,
-                      role: event.target.value,
-                    }))
-                  }
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none focus:border-amber-400"
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowDirectorCode((v) => !v)}
+                  className="text-sm font-bold text-slate-400 hover:text-amber-300 transition-colors"
                 >
-                  <option>Admin</option>
-                  <option>Musician</option>
-                  <option>Choir Member</option>
-                </select>
-              </label>
+                  {showDirectorCode ? "▼" : "▶"} I'm a Music Director
+                </button>
+                {showDirectorCode && (
+                  <div className="mt-3">
+                    <AuthInput
+                      label="Director Code"
+                      value={authForm.directorCode}
+                      onChange={(value) =>
+                        setAuthForm((prev) => ({ ...prev, directorCode: value }))
+                      }
+                      placeholder="Enter your director code"
+                    />
+                    <p className="mt-2 text-xs text-slate-500">
+                      This code is provided by your church administrator.
+                    </p>
+                  </div>
+                )}
+              </div>
             )}
 
             <button

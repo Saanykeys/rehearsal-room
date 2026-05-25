@@ -1,0 +1,11 @@
+{
+  "Jwt": {
+    "Key": "REPLACE_WITH_A_LONG_RANDOM_STRING_AT_LEAST_32_CHARS",
+    "Issuer": "RehearsalRoomAPI",
+    "Audience": "RehearsalRoomClient"
+  },
+  "App": {
+    "DirectorCode": "REPLACE_WITH_YOUR_DIRECTOR_CODE",
+    "FrontendUrl": "http://localhost:5173"
+  }
+}

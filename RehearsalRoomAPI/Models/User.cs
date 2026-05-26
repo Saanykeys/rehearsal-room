@@ -18,5 +18,16 @@ namespace RehearsalRoomAPI.Models
         public int OrganizationId { get; set; } = 0;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// True once the user has clicked the verification link in their email.
+        /// Existing users default to true so they are not locked out.
+        /// </summary>
+        public bool IsEmailVerified { get; set; } = true;
+
+        /// <summary>
+        /// One-time token sent in the verification email. Cleared after use.
+        /// </summary>
+        public string? EmailVerificationToken { get; set; }
     }
 }

@@ -7,8 +7,10 @@ using RehearsalRoomAPI.Dtos;
 using RehearsalRoomAPI.Models;
 using RehearsalRoomAPI.Models.Auth;
 using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 
 namespace RehearsalRoomAPI.Controllers
 {
@@ -18,11 +20,13 @@ namespace RehearsalRoomAPI.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
+        private readonly IHttpClientFactory _httpClientFactory;
 
-        public AuthController(AppDbContext context, IConfiguration configuration)
+        public AuthController(AppDbContext context, IConfiguration configuration, IHttpClientFactory httpClientFactory)
         {
             _context = context;
             _configuration = configuration;
+            _httpClientFactory = httpClientFactory;
         }
 
         [HttpPost("register")]
@@ -50,13 +54,10 @@ namespace RehearsalRoomAPI.Controllers
 
             if (isDirector)
             {
-                // Director registers → create a new organization
                 if (string.IsNullOrWhiteSpace(request.OrgName))
                     return BadRequest("Organization name is required when registering as a Music Director.");
 
                 var inviteCode = GenerateInviteCode();
-
-                // Retry on the rare collision
                 while (await _context.Organizations.AnyAsync(o => o.InviteCode == inviteCode))
                     inviteCode = GenerateInviteCode();
 
@@ -68,11 +69,10 @@ namespace RehearsalRoomAPI.Controllers
                 };
 
                 _context.Organizations.Add(org);
-                await _context.SaveChangesAsync(); // Get the org Id
+                await _context.SaveChangesAsync();
             }
             else
             {
-                // Team member registers → must supply a valid invite code
                 if (string.IsNullOrWhiteSpace(request.InviteCode))
                     return BadRequest("An invite code is required. Ask your Music Director for the code.");
 
@@ -85,20 +85,24 @@ namespace RehearsalRoomAPI.Controllers
                 org = foundOrg;
             }
 
-            // ── Create user ───────────────────────────────────────────────────
+            // ── Create user (unverified) ──────────────────────────────────────
+            var verificationToken = Guid.NewGuid().ToString("N"); // 32-char hex
+
             var user = new User
             {
                 FullName = request.FullName.Trim(),
                 Email = request.Email.Trim().ToLower(),
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
                 Role = isDirector ? "Music Director" : "Team Member",
-                OrganizationId = org.Id
+                OrganizationId = org.Id,
+                IsEmailVerified = false,
+                EmailVerificationToken = verificationToken
             };
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            // ── Auto-seed attendance for upcoming rehearsals in this org ──────
+            // ── Auto-seed attendance ──────────────────────────────────────────
             var upcomingRehearsals = await _context.RehearsalEvents
                 .Where(e => e.OrganizationId == org.Id && e.EventDate >= DateTime.UtcNow.Date)
                 .ToListAsync();
@@ -119,7 +123,20 @@ namespace RehearsalRoomAPI.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            return Ok(CreateAuthResponse(user, org, "User registered successfully"));
+            // ── Send verification email ───────────────────────────────────────
+            var frontendUrl = _configuration["App:FrontendUrl"]?.Split(',')[0].Trim()
+                              ?? "https://rehearsal-room.vercel.app";
+            var verifyLink = $"{frontendUrl}/verify-email?token={verificationToken}";
+
+            await SendVerificationEmailAsync(user.Email, user.FullName, verifyLink);
+
+            // Return without a token — user must verify first
+            return Ok(new
+            {
+                message = "Registration successful! Please check your email to verify your account.",
+                requiresVerification = true,
+                email = user.Email
+            });
         }
 
         [HttpPost("login")]
@@ -136,12 +153,68 @@ namespace RehearsalRoomAPI.Controllers
             if (!passwordValid)
                 return Unauthorized("Invalid email or password.");
 
-            // Load the organization for the invite code
+            // ── Block unverified accounts ─────────────────────────────────────
+            if (!user.IsEmailVerified)
+                return StatusCode(403, "Please verify your email before logging in. Check your inbox for the verification link.");
+
             var org = user.OrganizationId > 0
                 ? await _context.Organizations.FindAsync(user.OrganizationId)
                 : null;
 
             return Ok(CreateAuthResponse(user, org, "Login successful"));
+        }
+
+        [HttpGet("verify-email")]
+        public async Task<IActionResult> VerifyEmail([FromQuery] string token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+                return BadRequest("Invalid verification token.");
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.EmailVerificationToken == token);
+
+            if (user == null)
+                return BadRequest("This verification link is invalid or has already been used.");
+
+            user.IsEmailVerified = true;
+            user.EmailVerificationToken = null;
+            await _context.SaveChangesAsync();
+
+            var org = user.OrganizationId > 0
+                ? await _context.Organizations.FindAsync(user.OrganizationId)
+                : null;
+
+            return Ok(new
+            {
+                message = "Email verified successfully! You can now log in.",
+                verified = true
+            });
+        }
+
+        [HttpPost("resend-verification")]
+        public async Task<IActionResult> ResendVerification([FromBody] ResendVerificationDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Email))
+                return BadRequest("Email is required.");
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email == dto.Email.Trim().ToLower());
+
+            // Always return OK to avoid email enumeration attacks
+            if (user == null || user.IsEmailVerified)
+                return Ok(new { message = "If that email exists and is unverified, a new link has been sent." });
+
+            // Generate a fresh token
+            user.EmailVerificationToken = Guid.NewGuid().ToString("N");
+            await _context.SaveChangesAsync();
+
+            var frontendUrl = _configuration["App:FrontendUrl"]?.Split(',')[0].Trim()
+                              ?? "https://rehearsal-room.vercel.app";
+            var verifyLink = $"{frontendUrl}/verify-email?token={user.EmailVerificationToken}";
+
+            await SendVerificationEmailAsync(user.Email, user.FullName, verifyLink);
+
+            return Ok(new { message = "If that email exists and is unverified, a new link has been sent." });
         }
 
         [HttpPut("update-name")]
@@ -153,8 +226,7 @@ namespace RehearsalRoomAPI.Controllers
                 return Unauthorized("Invalid token.");
 
             var user = await _context.Users.FindAsync(userId);
-            if (user == null)
-                return NotFound("User not found.");
+            if (user == null) return NotFound("User not found.");
 
             if (string.IsNullOrWhiteSpace(dto.FullName))
                 return BadRequest("Name cannot be empty.");
@@ -174,8 +246,7 @@ namespace RehearsalRoomAPI.Controllers
                 return Unauthorized("Invalid token.");
 
             var user = await _context.Users.FindAsync(userId);
-            if (user == null)
-                return NotFound("User not found.");
+            if (user == null) return NotFound("User not found.");
 
             if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
                 return BadRequest("Current password is incorrect.");
@@ -191,9 +262,45 @@ namespace RehearsalRoomAPI.Controllers
 
         // ── Helpers ───────────────────────────────────────────────────────────
 
+        private async Task SendVerificationEmailAsync(string toEmail, string toName, string verifyLink)
+        {
+            try
+            {
+                var resendApiKey = _configuration["Resend:ApiKey"] ?? "";
+                if (string.IsNullOrWhiteSpace(resendApiKey)) return;
+
+                var client = _httpClientFactory.CreateClient();
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", resendApiKey);
+
+                var payload = new
+                {
+                    from = "Rehearsal Room <noreply@rehearsalroom.app>",
+                    to = new[] { toEmail },
+                    subject = "Verify your Rehearsal Room account",
+                    html = $@"
+                        <div style=""font-family:sans-serif;max-width:480px;margin:0 auto;background:#0f172a;color:#f8fafc;padding:32px;border-radius:16px"">
+                          <p style=""font-size:11px;font-weight:900;letter-spacing:0.3em;text-transform:uppercase;color:#fbbf24;margin:0 0 16px"">Rehearsal Room</p>
+                          <h1 style=""font-size:24px;font-weight:900;margin:0 0 12px"">Verify your email</h1>
+                          <p style=""color:#94a3b8;margin:0 0 24px"">Hi {toName}, thanks for signing up! Click the button below to verify your email address and activate your account.</p>
+                          <a href=""{verifyLink}"" style=""display:inline-block;background:#fbbf24;color:#0f172a;font-weight:900;padding:14px 28px;border-radius:12px;text-decoration:none;font-size:15px"">Verify Email Address</a>
+                          <p style=""color:#475569;font-size:12px;margin:24px 0 0"">If you didn't create this account, you can safely ignore this email. This link expires in 24 hours.</p>
+                          <p style=""color:#475569;font-size:12px;margin:8px 0 0"">Or copy this link: <a href=""{verifyLink}"" style=""color:#fbbf24"">{verifyLink}</a></p>
+                        </div>"
+                };
+
+                var json = JsonSerializer.Serialize(payload);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                await client.PostAsync("https://api.resend.com/emails", content);
+            }
+            catch
+            {
+                // Email failure should not block registration
+            }
+        }
+
         private static string GenerateInviteCode()
         {
-            // 8-character uppercase alphanumeric code (no O, 0, I, L to avoid confusion)
             const string chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
             var random = new Random();
             return new string(Enumerable.Range(0, 8).Select(_ => chars[random.Next(chars.Length)]).ToArray());
@@ -227,7 +334,6 @@ namespace RehearsalRoomAPI.Controllers
             };
 
             var jwtKey = _configuration["Jwt:Key"];
-
             if (string.IsNullOrWhiteSpace(jwtKey))
                 throw new Exception("JWT Key is missing from appsettings.json.");
 

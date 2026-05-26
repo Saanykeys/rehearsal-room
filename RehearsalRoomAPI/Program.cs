@@ -144,6 +144,9 @@ using (var scope = app.Services.CreateScope())
             @"ALTER TABLE ""RehearsalEvents""   ADD COLUMN IF NOT EXISTS ""OrganizationId"" INTEGER NOT NULL DEFAULT 0",
             @"ALTER TABLE ""Announcements""     ADD COLUMN IF NOT EXISTS ""OrganizationId"" INTEGER NOT NULL DEFAULT 0",
             @"ALTER TABLE ""AttendanceRecords"" ADD COLUMN IF NOT EXISTS ""OrganizationId"" INTEGER NOT NULL DEFAULT 0",
+            // Email verification — existing users default to verified so they are not locked out
+            @"ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""IsEmailVerified"" BOOLEAN NOT NULL DEFAULT TRUE",
+            @"ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""EmailVerificationToken"" TEXT NULL",
         })
         {
             try { db.Database.ExecuteSqlRaw(stmt); } catch { /* column already exists */ }
@@ -168,7 +171,7 @@ using (var scope = app.Services.CreateScope())
             CREATE UNIQUE INDEX IF NOT EXISTS IX_Organizations_InviteCode ON Organizations (InviteCode)
         ");
 
-        // Add OrganizationId column to existing tables — run individually so "duplicate column" errors are silently ignored
+        // Add columns — run individually so "duplicate column" errors are silently ignored
         foreach (var stmt in new[]
         {
             "ALTER TABLE Users             ADD COLUMN OrganizationId INTEGER NOT NULL DEFAULT 0",
@@ -176,6 +179,9 @@ using (var scope = app.Services.CreateScope())
             "ALTER TABLE RehearsalEvents   ADD COLUMN OrganizationId INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE Announcements     ADD COLUMN OrganizationId INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE AttendanceRecords ADD COLUMN OrganizationId INTEGER NOT NULL DEFAULT 0",
+            // Email verification — existing users default to verified
+            "ALTER TABLE Users ADD COLUMN IsEmailVerified INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE Users ADD COLUMN EmailVerificationToken TEXT NULL",
         })
         {
             try { db.Database.ExecuteSqlRaw(stmt); } catch { /* column already exists */ }

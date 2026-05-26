@@ -5,6 +5,7 @@ import LandingPage from "./pages/LandingPage";
 import WaitlistPage from "./pages/WaitlistPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import TermsPage from "./pages/TermsPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 
@@ -39,6 +40,7 @@ export default function App() {
   const [authMode, setAuthMode] = useState("login");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState(null);
 
   const [authForm, setAuthForm] = useState({
     fullName: "",
@@ -87,11 +89,22 @@ export default function App() {
       try { data = JSON.parse(text); } catch { data = text; }
 
       if (!response.ok) {
-        setAuthError(
-          typeof data === "string"
-            ? data
-            : data?.message || "Authentication failed."
-        );
+        // 403 = email not verified
+        if (response.status === 403) {
+          setAuthError("Please verify your email before logging in. Check your inbox for the verification link.");
+        } else {
+          setAuthError(
+            typeof data === "string"
+              ? data
+              : data?.message || "Authentication failed."
+          );
+        }
+        return;
+      }
+
+      // Registration returns requiresVerification flag — show check-email screen
+      if (data.requiresVerification) {
+        setPendingVerificationEmail(data.email);
         return;
       }
 
@@ -104,7 +117,7 @@ export default function App() {
         role: data.role,
         organizationId: data.organizationId,
         orgName: data.orgName,
-        inviteCode: data.inviteCode, // Only populated for Music Directors
+        inviteCode: data.inviteCode,
       };
 
       localStorage.setItem("rehearsalRoomToken", userToken);
@@ -112,7 +125,7 @@ export default function App() {
 
       setToken(userToken);
       setCurrentUser(user);
-      setShowDashboard(true); // go straight to dashboard after login/register
+      setShowDashboard(true);
     } catch (error) {
       console.error(error);
       setAuthError("Could not connect to the authentication server.");
@@ -146,6 +159,11 @@ export default function App() {
     return <TermsPage />;
   }
 
+  // Show email verification at /verify-email
+  if (window.location.pathname === "/verify-email") {
+    return <VerifyEmailPage />;
+  }
+
   // Always show the dashboard if the user explicitly navigated there
   if (isLoggedIn && showDashboard) {
     return (
@@ -153,6 +171,11 @@ export default function App() {
         <AdminDashboard currentUser={currentUser} token={token} onLogout={logout} />
       </div>
     );
+  }
+
+  // Check-your-email screen after registration
+  if (pendingVerificationEmail) {
+    return <CheckEmailScreen email={pendingVerificationEmail} onBack={() => { setPendingVerificationEmail(null); setShowAuth(false); }} apiBase={API_BASE} />;
   }
 
   // Auth screen (login / register)
@@ -425,6 +448,71 @@ function AuthInput({ label, value, onChange, placeholder, type = "text" }) {
         )}
       </div>
     </label>
+  );
+}
+
+function CheckEmailScreen({ email, onBack, apiBase }) {
+  const [resent, setResent] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      await fetch(`${apiBase}/api/Auth/resend-verification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      setResent(true);
+    } catch {
+      // silent
+    } finally {
+      setResending(false);
+    }
+  };
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 px-5 text-white">
+      <div className="w-full max-w-md text-center">
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-amber-400/10">
+            <svg className="h-8 w-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+
+          <p className="text-xs font-black uppercase tracking-[0.3em] text-amber-300">Almost there</p>
+          <h1 className="mt-3 text-3xl font-black">Check your email</h1>
+          <p className="mt-3 text-slate-400">
+            We sent a verification link to{" "}
+            <span className="font-bold text-white">{email}</span>.
+            Click the link in that email to activate your account.
+          </p>
+
+          <div className="mt-6 rounded-2xl bg-white/5 border border-white/10 px-5 py-4 text-sm text-slate-400">
+            <p>Didn't get it? Check your spam folder, or</p>
+            {resent ? (
+              <p className="mt-2 font-bold text-emerald-300">✓ New link sent!</p>
+            ) : (
+              <button
+                onClick={handleResend}
+                disabled={resending}
+                className="mt-2 font-bold text-amber-400 hover:text-amber-300 transition-colors disabled:opacity-50"
+              >
+                {resending ? "Sending…" : "resend the verification email"}
+              </button>
+            )}
+          </div>
+
+          <button
+            onClick={onBack}
+            className="mt-5 w-full rounded-2xl bg-white/10 px-5 py-3 font-bold text-slate-200 hover:bg-white/15 transition-colors"
+          >
+            ← Back to Home
+          </button>
+        </div>
+      </div>
+    </main>
   );
 }
 

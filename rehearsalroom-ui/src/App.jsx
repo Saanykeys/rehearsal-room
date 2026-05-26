@@ -6,6 +6,7 @@ import WaitlistPage from "./pages/WaitlistPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import TermsPage from "./pages/TermsPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 
@@ -41,6 +42,7 @@ export default function App() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState(null);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const [authForm, setAuthForm] = useState({
     fullName: "",
@@ -164,6 +166,11 @@ export default function App() {
     return <VerifyEmailPage />;
   }
 
+  // Show password reset at /reset-password
+  if (window.location.pathname === "/reset-password") {
+    return <ResetPasswordPage />;
+  }
+
   // Always show the dashboard if the user explicitly navigated there
   if (isLoggedIn && showDashboard) {
     return (
@@ -178,6 +185,11 @@ export default function App() {
     return <CheckEmailScreen email={pendingVerificationEmail} onBack={() => { setPendingVerificationEmail(null); setShowAuth(false); }} apiBase={API_BASE} />;
   }
 
+  // Forgot password screen
+  if (showForgotPassword) {
+    return <ForgotPasswordScreen onBack={() => setShowForgotPassword(false)} apiBase={API_BASE} />;
+  }
+
   // Auth screen (login / register)
   if (!isLoggedIn && showAuth) {
     return (
@@ -190,6 +202,7 @@ export default function App() {
         authLoading={authLoading}
         handleAuthSubmit={handleAuthSubmit}
         onBack={() => setShowAuth(false)}
+        onForgotPassword={() => setShowForgotPassword(true)}
       />
     );
   }
@@ -220,6 +233,7 @@ function AuthScreen({
   authLoading,
   handleAuthSubmit,
   onBack,
+  onForgotPassword,
 }) {
   const [showDirectorCode, setShowDirectorCode] = useState(false);
   const isLogin = authMode === "login";
@@ -321,6 +335,18 @@ function AuthScreen({
               }
               placeholder="Password123!"
             />
+
+            {isLogin && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={onForgotPassword}
+                  className="text-sm font-bold text-slate-500 hover:text-amber-400 transition-colors"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
 
             {!isLogin && (
               <>
@@ -448,6 +474,110 @@ function AuthInput({ label, value, onChange, placeholder, type = "text" }) {
         )}
       </div>
     </label>
+  );
+}
+
+function ForgotPasswordScreen({ onBack, apiBase }) {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState("idle"); // idle | loading | sent | error
+  const [message, setMessage] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setStatus("loading");
+
+    try {
+      const res = await fetch(`${apiBase}/api/Auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = { message: text }; }
+
+      if (res.ok) {
+        setStatus("sent");
+        setMessage(data.message || "Check your email for a reset link.");
+      } else {
+        setStatus("error");
+        setMessage(data.message || "Something went wrong. Please try again.");
+      }
+    } catch {
+      setStatus("error");
+      setMessage("Could not connect to the server. Please try again.");
+    }
+  };
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 px-5 text-white">
+      <div className="w-full max-w-md">
+        <div className="rounded-3xl border border-white/10 bg-slate-950/80 p-7 shadow-2xl backdrop-blur">
+          <button
+            type="button"
+            onClick={onBack}
+            className="mb-6 rounded-xl bg-white/10 px-4 py-2 text-sm font-bold text-slate-200 hover:bg-white/15 transition-colors"
+          >
+            ← Back to Login
+          </button>
+
+          {status === "sent" ? (
+            <div className="text-center py-4">
+              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-amber-400/10">
+                <svg className="h-7 w-7 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-black">Check your email</h2>
+              <p className="mt-3 text-slate-400">{message}</p>
+              <p className="mt-2 text-sm text-slate-500">The link expires in 1 hour.</p>
+              <button
+                onClick={onBack}
+                className="mt-6 w-full rounded-2xl bg-white/10 px-5 py-3 font-bold text-slate-200 hover:bg-white/15 transition-colors"
+              >
+                ← Back to Login
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs font-black uppercase tracking-[0.3em] text-amber-300">Account Recovery</p>
+              <h2 className="mt-3 text-3xl font-black">Forgot password?</h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Enter your email and we'll send you a link to reset your password.
+              </p>
+
+              {status === "error" && (
+                <div className="mt-5 rounded-2xl bg-red-500/20 px-4 py-3 text-sm font-bold text-red-200">
+                  {message}
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+                <label>
+                  <span className="text-sm font-bold text-slate-200">Email address</span>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@church.com"
+                    required
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-amber-400"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={status === "loading"}
+                  className="w-full rounded-2xl bg-amber-400 px-5 py-3 font-black text-slate-950 transition hover:scale-[1.02] disabled:opacity-60"
+                >
+                  {status === "loading" ? "Sending…" : "Send Reset Link"}
+                </button>
+              </form>
+            </>
+          )}
+        </div>
+      </div>
+    </main>
   );
 }
 

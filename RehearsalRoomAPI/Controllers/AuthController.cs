@@ -217,6 +217,59 @@ namespace RehearsalRoomAPI.Controllers
             return Ok(new { message = "If that email exists and is unverified, a new link has been sent." });
         }
 
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Email))
+                return BadRequest("Email is required.");
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email == dto.Email.Trim().ToLower());
+
+            // Always return OK — never reveal whether the email exists
+            if (user == null)
+                return Ok(new { message = "If that email is registered, a reset link has been sent." });
+
+            // Generate a secure token valid for 1 hour
+            user.PasswordResetToken = Guid.NewGuid().ToString("N");
+            user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
+            await _context.SaveChangesAsync();
+
+            var frontendUrl = _configuration["App:FrontendUrl"]?.Split(',')[0].Trim()
+                              ?? "https://rehearsal-room.vercel.app";
+            var resetLink = $"{frontendUrl}/reset-password?token={user.PasswordResetToken}";
+
+            await SendPasswordResetEmailAsync(user.Email, user.FullName, resetLink);
+
+            return Ok(new { message = "If that email is registered, a reset link has been sent." });
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Token))
+                return BadRequest("Invalid reset token.");
+
+            if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 8)
+                return BadRequest("Password must be at least 8 characters.");
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.PasswordResetToken == dto.Token);
+
+            if (user == null)
+                return BadRequest("This reset link is invalid or has already been used.");
+
+            if (user.PasswordResetTokenExpiry == null || user.PasswordResetTokenExpiry < DateTime.UtcNow)
+                return BadRequest("This reset link has expired. Please request a new one.");
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            user.PasswordResetToken = null;
+            user.PasswordResetTokenExpiry = null;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Password reset successfully. You can now log in with your new password." });
+        }
+
         [HttpPut("update-name")]
         [Authorize]
         public async Task<IActionResult> UpdateName([FromBody] UpdateNameDto dto)
@@ -296,6 +349,43 @@ namespace RehearsalRoomAPI.Controllers
             catch
             {
                 // Email failure should not block registration
+            }
+        }
+
+        private async Task SendPasswordResetEmailAsync(string toEmail, string toName, string resetLink)
+        {
+            try
+            {
+                var resendApiKey = _configuration["Resend:ApiKey"] ?? "";
+                if (string.IsNullOrWhiteSpace(resendApiKey)) return;
+
+                var client = _httpClientFactory.CreateClient();
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", resendApiKey);
+
+                var payload = new
+                {
+                    from = "Rehearsal Room <noreply@rehearsalroom.app>",
+                    to = new[] { toEmail },
+                    subject = "Reset your Rehearsal Room password",
+                    html = $@"
+                        <div style=""font-family:sans-serif;max-width:480px;margin:0 auto;background:#0f172a;color:#f8fafc;padding:32px;border-radius:16px"">
+                          <p style=""font-size:11px;font-weight:900;letter-spacing:0.3em;text-transform:uppercase;color:#fbbf24;margin:0 0 16px"">Rehearsal Room</p>
+                          <h1 style=""font-size:24px;font-weight:900;margin:0 0 12px"">Reset your password</h1>
+                          <p style=""color:#94a3b8;margin:0 0 24px"">Hi {toName}, we received a request to reset your password. Click the button below to choose a new one.</p>
+                          <a href=""{resetLink}"" style=""display:inline-block;background:#fbbf24;color:#0f172a;font-weight:900;padding:14px 28px;border-radius:12px;text-decoration:none;font-size:15px"">Reset Password</a>
+                          <p style=""color:#475569;font-size:12px;margin:24px 0 0"">This link expires in <strong style=""color:#94a3b8"">1 hour</strong>. If you didn't request a password reset, you can safely ignore this email — your password will not change.</p>
+                          <p style=""color:#475569;font-size:12px;margin:8px 0 0"">Or copy this link: <a href=""{resetLink}"" style=""color:#fbbf24"">{resetLink}</a></p>
+                        </div>"
+                };
+
+                var json = JsonSerializer.Serialize(payload);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                await client.PostAsync("https://api.resend.com/emails", content);
+            }
+            catch
+            {
+                // Email failure should not surface as an error
             }
         }
 

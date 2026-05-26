@@ -29,5 +29,15 @@ namespace RehearsalRoomAPI.Models
         /// One-time token sent in the verification email. Cleared after use.
         /// </summary>
         public string? EmailVerificationToken { get; set; }
+
+        /// <summary>
+        /// One-time token sent in the password reset email. Cleared after use.
+        /// </summary>
+        public string? PasswordResetToken { get; set; }
+
+        /// <summary>
+        /// UTC expiry for the password reset token (1 hour window).
+        /// </summary>
+        public DateTime? PasswordResetTokenExpiry { get; set; }
     }
 }

@@ -3,6 +3,7 @@ import rehearsalLogo from "./assets/rehearsalroom-logo.png";
 import AdminDashboard from "./components/AdminDashboard";
 import LandingPage from "./pages/LandingPage";
 import WaitlistPage from "./pages/WaitlistPage";
+import { Analytics } from "@vercel/analytics/react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5281";
 
@@ -160,12 +161,15 @@ export default function App() {
   // Landing page — shown to everyone at the root URL
   // Logged-in users see a "Go to Dashboard" button instead of Login/Register
   return (
-    <LandingPage
-      isLoggedIn={isLoggedIn}
-      onGetStarted={() => { setAuthMode("register"); setShowAuth(true); }}
-      onLogin={() => { setAuthMode("login"); setShowAuth(true); }}
-      onGoToDashboard={() => setShowDashboard(true)}
-    />
+    <>
+      <LandingPage
+        isLoggedIn={isLoggedIn}
+        onGetStarted={() => { setAuthMode("register"); setShowAuth(true); }}
+        onLogin={() => { setAuthMode("login"); setShowAuth(true); }}
+        onGoToDashboard={() => setShowDashboard(true)}
+      />
+      <Analytics />
+    </>
   );
 }
 

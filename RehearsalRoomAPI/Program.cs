@@ -118,8 +118,36 @@ using (var scope = app.Services.CreateScope())
 
     if (usePostgres)
     {
-        // Fresh PostgreSQL database — create all tables from the EF model
+        // Create any tables that don't exist yet (safe on first run and after schema changes)
         db.Database.EnsureCreated();
+
+        // Safety net for schema changes added after the initial deploy.
+        // EnsureCreated() only runs when the DB is brand-new; these handle incremental additions.
+        db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""Organizations"" (
+                ""Id""         SERIAL PRIMARY KEY,
+                ""Name""       TEXT NOT NULL DEFAULT '',
+                ""InviteCode"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt""  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        ");
+        db.Database.ExecuteSqlRaw(@"
+            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_Organizations_InviteCode""
+            ON ""Organizations"" (""InviteCode"")
+        ");
+
+        // Add OrganizationId to existing tables — silently skip if already present
+        foreach (var stmt in new[]
+        {
+            @"ALTER TABLE ""Users""             ADD COLUMN IF NOT EXISTS ""OrganizationId"" INTEGER NOT NULL DEFAULT 0",
+            @"ALTER TABLE ""Songs""             ADD COLUMN IF NOT EXISTS ""OrganizationId"" INTEGER NOT NULL DEFAULT 0",
+            @"ALTER TABLE ""RehearsalEvents""   ADD COLUMN IF NOT EXISTS ""OrganizationId"" INTEGER NOT NULL DEFAULT 0",
+            @"ALTER TABLE ""Announcements""     ADD COLUMN IF NOT EXISTS ""OrganizationId"" INTEGER NOT NULL DEFAULT 0",
+            @"ALTER TABLE ""AttendanceRecords"" ADD COLUMN IF NOT EXISTS ""OrganizationId"" INTEGER NOT NULL DEFAULT 0",
+        })
+        {
+            try { db.Database.ExecuteSqlRaw(stmt); } catch { /* column already exists */ }
+        }
     }
     else
     {

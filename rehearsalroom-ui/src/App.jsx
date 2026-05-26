@@ -8,6 +8,7 @@ const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5281";
 
 export default function App() {
   const [showAuth, setShowAuth] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
 
   const [currentUser, setCurrentUser] = useState(() => {
     const savedUser = localStorage.getItem("rehearsalRoomUser");
@@ -107,6 +108,7 @@ export default function App() {
 
       setToken(userToken);
       setCurrentUser(user);
+      setShowDashboard(true); // go straight to dashboard after login/register
     } catch (error) {
       console.error(error);
       setAuthError("Could not connect to the authentication server.");
@@ -122,6 +124,7 @@ export default function App() {
     setCurrentUser(null);
     setAuthMode("login");
     setShowAuth(false);
+    setShowDashboard(false);
   };
 
   // Show waitlist page at /waitlist
@@ -129,15 +132,16 @@ export default function App() {
     return <WaitlistPage />;
   }
 
-  if (!isLoggedIn && !showAuth) {
+  // Always show the dashboard if the user explicitly navigated there
+  if (isLoggedIn && showDashboard) {
     return (
-      <LandingPage
-        onGetStarted={() => { setAuthMode("register"); setShowAuth(true); }}
-        onLogin={() => { setAuthMode("login"); setShowAuth(true); }}
-      />
+      <div className="min-h-screen bg-slate-950">
+        <AdminDashboard currentUser={currentUser} token={token} onLogout={logout} />
+      </div>
     );
   }
 
+  // Auth screen (login / register)
   if (!isLoggedIn && showAuth) {
     return (
       <AuthScreen
@@ -152,10 +156,16 @@ export default function App() {
       />
     );
   }
+
+  // Landing page — shown to everyone at the root URL
+  // Logged-in users see a "Go to Dashboard" button instead of Login/Register
   return (
-    <div className="min-h-screen bg-slate-950">
-      <AdminDashboard currentUser={currentUser} token={token} onLogout={logout} />
-    </div>
+    <LandingPage
+      isLoggedIn={isLoggedIn}
+      onGetStarted={() => { setAuthMode("register"); setShowAuth(true); }}
+      onLogin={() => { setAuthMode("login"); setShowAuth(true); }}
+      onGoToDashboard={() => setShowDashboard(true)}
+    />
   );
 }
 

@@ -547,13 +547,17 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
       return;
     }
     try {
-      // Register the new user via the Auth endpoint (creates a real hashed account)
-      // Director code is passed through from the form — backend verifies it server-side
+      // Register the new user via the Auth endpoint.
+      // Team members join using the director's org invite code (auto-populated).
+      // Passing directorCode lets the director also add another director if needed.
       const payload = {
         fullName: fullName.trim(),
         email: email.trim(),
         password,
         directorCode: inviteMemberForm.directorCode ?? "",
+        // Always include the org invite code so the new member joins the right org
+        inviteCode: currentUser?.inviteCode ?? "",
+        orgName: "",
       };
       const res = await fetch(`${API_BASE}/api/Auth/register`, {
         method: "POST",
@@ -2523,6 +2527,42 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                   </button>
                 </div>
               </div>
+
+              {/* Organization — invite code for directors */}
+              {currentUser?.role === "Music Director" && currentUser?.inviteCode && (
+                <div className="rounded-3xl border border-amber-400/20 bg-amber-950/20 p-6 shadow-xl">
+                  <h3 className="text-2xl font-black">Your Organization</h3>
+                  <p className="mt-2 text-sm text-slate-400">
+                    Share this invite code with your worship team members so they can register and join your workspace.
+                  </p>
+                  <div className="mt-6 grid gap-4 md:grid-cols-2">
+                    <div className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-4">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Organization</p>
+                      <p className="mt-2 font-black text-white">{currentUser?.orgName || "—"}</p>
+                    </div>
+                    <div className="rounded-2xl border border-amber-400/30 bg-slate-950 px-4 py-4">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Team Invite Code</p>
+                      <div className="mt-2 flex items-center gap-3">
+                        <p className="font-mono text-xl font-black tracking-[0.2em] text-amber-300">
+                          {currentUser?.inviteCode}
+                        </p>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(currentUser?.inviteCode || "");
+                            alert("Invite code copied to clipboard!");
+                          }}
+                          className="rounded-xl bg-amber-400/20 px-3 py-1.5 text-xs font-black text-amber-300 hover:bg-amber-400/30 transition-all"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="mt-4 text-xs text-slate-500">
+                    Team members enter this code on the registration screen to join <strong className="text-slate-300">{currentUser?.orgName}</strong>. Keep it private — only share with people you trust.
+                  </p>
+                </div>
+              )}
 
               {/* App info */}
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl">

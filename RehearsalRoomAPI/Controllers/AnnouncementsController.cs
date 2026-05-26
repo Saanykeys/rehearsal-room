@@ -27,10 +27,15 @@ namespace RehearsalRoomAPI.Controllers
             _httpClientFactory = httpClientFactory;
         }
 
+        private int GetOrgId() =>
+            int.TryParse(User.FindFirst("OrganizationId")?.Value, out var id) ? id : 0;
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Announcement>>> GetAnnouncements()
         {
+            var orgId = GetOrgId();
             return await _context.Announcements
+                .Where(a => a.OrganizationId == orgId)
                 .OrderByDescending(a => a.CreatedAt)
                 .ToListAsync();
         }
@@ -39,8 +44,10 @@ namespace RehearsalRoomAPI.Controllers
         [Authorize(Roles = "Music Director")]
         public async Task<ActionResult<Announcement>> CreateAnnouncement([FromBody] Announcement announcement)
         {
+            var orgId = GetOrgId();
             var name = User.FindFirst(ClaimTypes.Name)?.Value ?? "Music Director";
 
+            announcement.OrganizationId = orgId;
             announcement.CreatedBy = name;
             announcement.CreatedAt = DateTime.UtcNow;
 
@@ -51,9 +58,9 @@ namespace RehearsalRoomAPI.Controllers
             await _context.SaveChangesAsync();
 
             // Send email (awaited so errors show in terminal)
-            await SendEmailsAsync(announcement);
+            await SendEmailsAsync(announcement, orgId);
 
-            // Pre-fetch subscriptions before the request ends (context gets disposed after)
+            // Pre-fetch subscriptions scoped to this org before the request ends
             var subscriptions = await _context.PushSubscriptions.ToListAsync<Models.PushSubscription>();
             _ = Task.Run(() => SendPushNotificationsAsync(announcement, subscriptions));
 
@@ -64,7 +71,10 @@ namespace RehearsalRoomAPI.Controllers
         [Authorize(Roles = "Music Director")]
         public async Task<IActionResult> DeleteAnnouncement(int id)
         {
-            var announcement = await _context.Announcements.FindAsync(id);
+            var orgId = GetOrgId();
+            var announcement = await _context.Announcements
+                .FirstOrDefaultAsync(a => a.Id == id && a.OrganizationId == orgId);
+
             if (announcement == null) return NotFound();
 
             _context.Announcements.Remove(announcement);
@@ -74,17 +84,20 @@ namespace RehearsalRoomAPI.Controllers
         }
 
         // ── Email via Resend ─────────────────────────────────────────────────
-        private async Task SendEmailsAsync(Announcement announcement)
+        private async Task SendEmailsAsync(Announcement announcement, int orgId)
         {
             var apiKey = _config["Resend:ApiKey"];
             var fromEmail = _config["Resend:FromEmail"] ?? "Rehearsal Room <noreply@rehearsalroom.app>";
 
             if (string.IsNullOrWhiteSpace(apiKey) || apiKey == "REPLACE_WITH_YOUR_RESEND_API_KEY")
-                return; // Resend not configured yet
+                return;
 
             try
             {
-                var users = await _context.Users.ToListAsync();
+                // Only email members of THIS organization
+                var users = await _context.Users
+                    .Where(u => u.OrganizationId == orgId)
+                    .ToListAsync();
                 var toEmails = users.Select(u => u.Email).Where(e => !string.IsNullOrWhiteSpace(e)).ToList();
                 if (toEmails.Count == 0) return;
 
@@ -101,8 +114,6 @@ namespace RehearsalRoomAPI.Controllers
                 var client = _httpClientFactory.CreateClient();
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
-                // NOTE: With onboarding@resend.dev, Resend only allows sending to your
-                // own verified email. Add a domain at resend.com/domains to send to everyone.
                 var testEmail = _config["Resend:TestEmail"];
                 var recipients = string.IsNullOrWhiteSpace(testEmail) ? toEmails : new List<string> { testEmail };
 
@@ -152,8 +163,6 @@ namespace RehearsalRoomAPI.Controllers
                     icon = "/rehearsalroom-logo.png"
                 });
 
-                var deadSubs = new List<int>();
-
                 foreach (var sub in subscriptions)
                 {
                     try
@@ -163,18 +172,13 @@ namespace RehearsalRoomAPI.Controllers
                     }
                     catch (WebPushException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Gone)
                     {
-                        // Subscription expired — mark for cleanup
-                        deadSubs.Add(sub.Id);
+                        Console.WriteLine($"[Push] Expired subscription {sub.Id} — will clean up next run.");
                     }
                     catch (Exception ex)
                     {
                         Console.WriteLine($"[Push] Failed for sub {sub.Id}: {ex.Message}");
                     }
                 }
-
-                // Log expired subscriptions (cleanup happens on next request)
-                if (deadSubs.Count > 0)
-                    Console.WriteLine($"[Push] {deadSubs.Count} expired subscription(s) — will be cleaned up on next run.");
             }
             catch (Exception ex)
             {

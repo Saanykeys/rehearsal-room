@@ -3,12 +3,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RehearsalRoomAPI.Data;
 using RehearsalRoomAPI.Models;
+using System.Security.Claims;
 
 namespace RehearsalRoomAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize] // Fixed: [Authorize] was commented out
+    [Authorize]
     public class AttendanceRecordsController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -18,19 +19,26 @@ namespace RehearsalRoomAPI.Controllers
             _context = context;
         }
 
-        // Any logged-in user can view attendance
+        private int GetOrgId() =>
+            int.TryParse(User.FindFirst("OrganizationId")?.Value, out var id) ? id : 0;
+
+        // Any logged-in user can view attendance for their org
         [HttpGet]
         public async Task<ActionResult<IEnumerable<AttendanceRecord>>> GetAttendanceRecords()
         {
-            return await _context.AttendanceRecords.ToListAsync();
+            var orgId = GetOrgId();
+            return await _context.AttendanceRecords
+                .Where(a => a.OrganizationId == orgId)
+                .ToListAsync();
         }
 
-        // Any logged-in user can view attendance for a specific rehearsal
+        // Any logged-in user can view attendance for a specific rehearsal in their org
         [HttpGet("rehearsal/{rehearsalEventId}")]
         public async Task<ActionResult<IEnumerable<AttendanceRecord>>> GetByRehearsal(int rehearsalEventId)
         {
+            var orgId = GetOrgId();
             return await _context.AttendanceRecords
-                .Where(a => a.RehearsalEventId == rehearsalEventId)
+                .Where(a => a.RehearsalEventId == rehearsalEventId && a.OrganizationId == orgId)
                 .ToListAsync();
         }
 
@@ -38,10 +46,8 @@ namespace RehearsalRoomAPI.Controllers
         [HttpPost]
         public async Task<ActionResult<AttendanceRecord>> CreateAttendanceRecord(AttendanceRecord record)
         {
-            record.Status = string.IsNullOrWhiteSpace(record.Status)
-                ? "Pending"
-                : record.Status;
-
+            record.OrganizationId = GetOrgId();
+            record.Status = string.IsNullOrWhiteSpace(record.Status) ? "Pending" : record.Status;
             record.RespondedAt = DateTime.UtcNow;
 
             _context.AttendanceRecords.Add(record);
@@ -54,12 +60,12 @@ namespace RehearsalRoomAPI.Controllers
         [HttpPut("{id}/status")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] string status)
         {
-            var record = await _context.AttendanceRecords.FindAsync(id);
+            var orgId = GetOrgId();
+            var record = await _context.AttendanceRecords
+                .FirstOrDefaultAsync(a => a.Id == id && a.OrganizationId == orgId);
 
             if (record == null)
-            {
                 return NotFound();
-            }
 
             record.Status = status;
             record.RespondedAt = DateTime.UtcNow;
@@ -69,17 +75,17 @@ namespace RehearsalRoomAPI.Controllers
             return Ok(record);
         }
 
-        // Only Admins can delete attendance records
+        // Only Directors can delete attendance records
         [HttpDelete("{id}")]
         [Authorize(Roles = "Music Director")]
         public async Task<IActionResult> DeleteAttendanceRecord(int id)
         {
-            var record = await _context.AttendanceRecords.FindAsync(id);
+            var orgId = GetOrgId();
+            var record = await _context.AttendanceRecords
+                .FirstOrDefaultAsync(a => a.Id == id && a.OrganizationId == orgId);
 
             if (record == null)
-            {
                 return NotFound();
-            }
 
             _context.AttendanceRecords.Remove(record);
             await _context.SaveChangesAsync();

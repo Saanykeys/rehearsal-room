@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RehearsalRoomAPI.Data;
 using RehearsalRoomAPI.Models;
+using System.Security.Claims;
 
 namespace RehearsalRoomAPI.Controllers
 {
@@ -18,15 +19,23 @@ namespace RehearsalRoomAPI.Controllers
             _context = context;
         }
 
+        private int GetOrgId() =>
+            int.TryParse(User.FindFirst("OrganizationId")?.Value, out var id) ? id : 0;
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<RehearsalEvent>>> GetEvents()
         {
+            var orgId = GetOrgId();
             var events = await _context.RehearsalEvents
+                .Where(e => e.OrganizationId == orgId)
                 .OrderBy(e => e.EventDate)
                 .ToListAsync();
 
             // Populate SongIds from the join table
-            var allRehearsalSongs = await _context.RehearsalSongs.ToListAsync();
+            var allRehearsalSongs = await _context.RehearsalSongs
+                .Where(rs => events.Select(e => e.Id).Contains(rs.RehearsalEventId))
+                .ToListAsync();
+
             foreach (var ev in events)
             {
                 ev.SongIds = allRehearsalSongs
@@ -43,8 +52,10 @@ namespace RehearsalRoomAPI.Controllers
         [Authorize(Roles = "Music Director")]
         public async Task<ActionResult<RehearsalEvent>> CreateEvent(RehearsalEvent rehearsalEvent)
         {
+            var orgId = GetOrgId();
             var songIds = rehearsalEvent.SongIds ?? new List<int>();
 
+            rehearsalEvent.OrganizationId = orgId;
             rehearsalEvent.CreatedAt = DateTime.UtcNow;
             _context.RehearsalEvents.Add(rehearsalEvent);
             await _context.SaveChangesAsync();
@@ -62,10 +73,14 @@ namespace RehearsalRoomAPI.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            // Auto-create a Pending attendance record for every registered user
-            var users = await _context.Users.ToListAsync();
+            // Auto-create Pending attendance records for every member in this org
+            var users = await _context.Users
+                .Where(u => u.OrganizationId == orgId)
+                .ToListAsync();
+
             var records = users.Select(u => new AttendanceRecord
             {
+                OrganizationId = orgId,
                 RehearsalEventId = rehearsalEvent.Id,
                 MemberName = u.FullName,
                 Role = u.Role,
@@ -84,7 +99,10 @@ namespace RehearsalRoomAPI.Controllers
         [Authorize(Roles = "Music Director")]
         public async Task<IActionResult> UpdateEvent(int id, RehearsalEvent updatedEvent)
         {
-            var rehearsalEvent = await _context.RehearsalEvents.FindAsync(id);
+            var orgId = GetOrgId();
+            var rehearsalEvent = await _context.RehearsalEvents
+                .FirstOrDefaultAsync(e => e.Id == id && e.OrganizationId == orgId);
+
             if (rehearsalEvent == null) return NotFound();
 
             rehearsalEvent.Title = updatedEvent.Title;
@@ -121,7 +139,10 @@ namespace RehearsalRoomAPI.Controllers
         [Authorize(Roles = "Music Director")]
         public async Task<IActionResult> DeleteEvent(int id)
         {
-            var rehearsalEvent = await _context.RehearsalEvents.FindAsync(id);
+            var orgId = GetOrgId();
+            var rehearsalEvent = await _context.RehearsalEvents
+                .FirstOrDefaultAsync(e => e.Id == id && e.OrganizationId == orgId);
+
             if (rehearsalEvent == null) return NotFound();
 
             // Cascade-delete song associations and attendance records

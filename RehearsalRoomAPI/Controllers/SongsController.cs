@@ -4,12 +4,13 @@ using Microsoft.EntityFrameworkCore;
 using RehearsalRoomAPI.Data;
 using RehearsalRoomAPI.Dtos;
 using RehearsalRoomAPI.Models;
+using System.Security.Claims;
 
 namespace RehearsalRoomAPI.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")] // Fixed: was [controller] (no api/) — now consistent with all other controllers
-    [Authorize]                 // Fixed: [Authorize] was commented out, leaving all reads public
+    [Route("api/[controller]")]
+    [Authorize]
     public class SongsController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -19,28 +20,33 @@ namespace RehearsalRoomAPI.Controllers
             _context = context;
         }
 
-        // Any logged-in user can view songs
+        private int GetOrgId() =>
+            int.TryParse(User.FindFirst("OrganizationId")?.Value, out var id) ? id : 0;
+
+        // Any logged-in user can view songs in their org
         [HttpGet]
         public async Task<IEnumerable<SongResponseDto>> Get()
         {
-            var songs = await _context.Songs.ToListAsync();
+            var orgId = GetOrgId();
+            var songs = await _context.Songs
+                .Where(s => s.OrganizationId == orgId)
+                .ToListAsync();
             return songs.Select(ToSongResponseDto);
         }
 
-        // Any logged-in user can search songs
+        // Any logged-in user can search songs in their org
         [HttpGet("search")]
         public async Task<IEnumerable<SongResponseDto>> Search([FromQuery] string query)
         {
             if (string.IsNullOrWhiteSpace(query))
-            {
                 return new List<SongResponseDto>();
-            }
 
+            var orgId = GetOrgId();
             var songs = await _context.Songs
-                .Where(s =>
-                    s.Title.ToLower().Contains(query.ToLower()) ||
-                    s.Key.ToLower().Contains(query.ToLower()) ||
-                    s.Category.ToLower().Contains(query.ToLower()))
+                .Where(s => s.OrganizationId == orgId &&
+                    (s.Title.ToLower().Contains(query.ToLower()) ||
+                     s.Key.ToLower().Contains(query.ToLower()) ||
+                     s.Category.ToLower().Contains(query.ToLower())))
                 .ToListAsync();
 
             return songs.Select(ToSongResponseDto);
@@ -53,6 +59,7 @@ namespace RehearsalRoomAPI.Controllers
         {
             var song = new Song
             {
+                OrganizationId = GetOrgId(),
                 Title = dto.Title,
                 Artist = dto.Artist,
                 Key = dto.Key,
@@ -73,12 +80,12 @@ namespace RehearsalRoomAPI.Controllers
         [Authorize(Roles = "Music Director")]
         public async Task<ActionResult<SongResponseDto>> Update(int id, UpdateSongDto dto)
         {
-            var song = await _context.Songs.FindAsync(id);
+            var orgId = GetOrgId();
+            var song = await _context.Songs
+                .FirstOrDefaultAsync(s => s.Id == id && s.OrganizationId == orgId);
 
             if (song == null)
-            {
                 return NotFound();
-            }
 
             song.Title = dto.Title;
             song.Artist = dto.Artist;
@@ -98,12 +105,12 @@ namespace RehearsalRoomAPI.Controllers
         [Authorize(Roles = "Music Director")]
         public async Task<IActionResult> Delete(int id)
         {
-            var song = await _context.Songs.FindAsync(id);
+            var orgId = GetOrgId();
+            var song = await _context.Songs
+                .FirstOrDefaultAsync(s => s.Id == id && s.OrganizationId == orgId);
 
             if (song == null)
-            {
                 return NotFound();
-            }
 
             _context.Songs.Remove(song);
             await _context.SaveChangesAsync();

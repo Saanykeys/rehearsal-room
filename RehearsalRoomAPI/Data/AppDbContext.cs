@@ -17,6 +17,8 @@ namespace RehearsalRoomAPI.Data
                 w.Ignore(RelationalEventId.PendingModelChangesWarning));
         }
 
+        public DbSet<Organization> Organizations { get; set; }
+
         public DbSet<Song> Songs { get; set; }
 
         public DbSet<SongSuggestion> SongSuggestions { get; set; }
@@ -36,5 +38,13 @@ namespace RehearsalRoomAPI.Data
         public DbSet<PushSubscription> PushSubscriptions { get; set; }
 
         public DbSet<WaitlistEntry> WaitlistEntries { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            // Unique invite code per organization
+            modelBuilder.Entity<Organization>()
+                .HasIndex(o => o.InviteCode)
+                .IsUnique();
+        }
     }
 }

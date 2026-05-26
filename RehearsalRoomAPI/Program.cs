@@ -129,6 +129,31 @@ using (var scope = app.Services.CreateScope())
 
         // Safety net: create tables that may not exist from migrations
         db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS Organizations (
+                Id          INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                Name        TEXT    NOT NULL DEFAULT '',
+                InviteCode  TEXT    NOT NULL DEFAULT '',
+                CreatedAt   TEXT    NOT NULL DEFAULT ''
+            )
+        ");
+        db.Database.ExecuteSqlRaw(@"
+            CREATE UNIQUE INDEX IF NOT EXISTS IX_Organizations_InviteCode ON Organizations (InviteCode)
+        ");
+
+        // Add OrganizationId column to existing tables — run individually so "duplicate column" errors are silently ignored
+        foreach (var stmt in new[]
+        {
+            "ALTER TABLE Users             ADD COLUMN OrganizationId INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE Songs             ADD COLUMN OrganizationId INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE RehearsalEvents   ADD COLUMN OrganizationId INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE Announcements     ADD COLUMN OrganizationId INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE AttendanceRecords ADD COLUMN OrganizationId INTEGER NOT NULL DEFAULT 0",
+        })
+        {
+            try { db.Database.ExecuteSqlRaw(stmt); } catch { /* column already exists */ }
+        }
+
+        db.Database.ExecuteSqlRaw(@"
             CREATE TABLE IF NOT EXISTS Announcements (
                 Id        INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                 Title     TEXT    NOT NULL DEFAULT '',

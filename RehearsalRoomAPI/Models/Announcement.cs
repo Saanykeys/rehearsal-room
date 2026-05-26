@@ -4,6 +4,8 @@ namespace RehearsalRoomAPI.Models
     {
         public int Id { get; set; }
 
+        public int OrganizationId { get; set; } = 0;
+
         public string Title { get; set; } = string.Empty;
 
         public string Body { get; set; } = string.Empty;

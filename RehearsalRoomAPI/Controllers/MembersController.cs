@@ -3,13 +3,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RehearsalRoomAPI.Data;
 using RehearsalRoomAPI.Models;
+using System.Security.Claims;
 
 namespace RehearsalRoomAPI.Controllers
 {
     /// <summary>
     /// Members are backed by the Users table so that login and membership
-    /// are always in sync.  The add-member flow uses Auth/register so
-    /// passwords are hashed and the new user can immediately log in.
+    /// are always in sync. Scoped to the caller's organization.
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
@@ -23,11 +23,16 @@ namespace RehearsalRoomAPI.Controllers
             _context = context;
         }
 
-        // Any logged-in user can view the members list
+        private int GetOrgId() =>
+            int.TryParse(User.FindFirst("OrganizationId")?.Value, out var id) ? id : 0;
+
+        // Any logged-in user can view members in their org
         [HttpGet]
         public async Task<ActionResult<IEnumerable<object>>> GetMembers()
         {
+            var orgId = GetOrgId();
             var users = await _context.Users
+                .Where(u => u.OrganizationId == orgId)
                 .OrderBy(u => u.FullName)
                 .Select(u => new
                 {
@@ -47,7 +52,10 @@ namespace RehearsalRoomAPI.Controllers
         [Authorize(Roles = "Music Director")]
         public async Task<IActionResult> UpdateMemberRole(int id, [FromBody] UpdateMemberRoleDto dto)
         {
-            var user = await _context.Users.FindAsync(id);
+            var orgId = GetOrgId();
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Id == id && u.OrganizationId == orgId);
+
             if (user == null) return NotFound();
 
             user.Role = dto.Role;
@@ -61,7 +69,10 @@ namespace RehearsalRoomAPI.Controllers
         [Authorize(Roles = "Music Director")]
         public async Task<IActionResult> DeleteMember(int id)
         {
-            var user = await _context.Users.FindAsync(id);
+            var orgId = GetOrgId();
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Id == id && u.OrganizationId == orgId);
+
             if (user == null) return NotFound();
 
             _context.Users.Remove(user);

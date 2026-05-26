@@ -27,6 +27,8 @@ export default function App() {
     email: "",
     password: "",
     directorCode: "",
+    orgName: "",
+    inviteCode: "",
   });
   const isLoggedIn = currentUser && token;
 
@@ -48,6 +50,8 @@ export default function App() {
             email: authForm.email,
             password: authForm.password,
             directorCode: authForm.directorCode,
+            orgName: authForm.orgName,
+            inviteCode: authForm.inviteCode,
           };
 
     try {
@@ -80,6 +84,9 @@ export default function App() {
         fullName: data.fullName,
         email: data.email,
         role: data.role,
+        organizationId: data.organizationId,
+        orgName: data.orgName,
+        inviteCode: data.inviteCode, // Only populated for Music Directors
       };
 
       localStorage.setItem("rehearsalRoomToken", userToken);
@@ -152,6 +159,7 @@ function AuthScreen({
 }) {
   const [showDirectorCode, setShowDirectorCode] = useState(false);
   const isLogin = authMode === "login";
+  const isDirector = showDirectorCode && authForm.directorCode.trim().length > 0;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 px-5 text-white">
@@ -209,7 +217,7 @@ function AuthScreen({
           <p className="mt-2 text-sm text-slate-400">
             {isLogin
               ? "Sign in with your Rehearsal Room account."
-              : "Create an account with a role."}
+              : "Create an account to join or start a worship team."}
           </p>
 
           {authError && (
@@ -220,16 +228,14 @@ function AuthScreen({
 
           <div className="mt-6 space-y-4">
             {!isLogin && (
-              <>
-                <AuthInput
-                  label="Full Name"
-                  value={authForm.fullName}
-                  onChange={(value) =>
-                    setAuthForm((prev) => ({ ...prev, fullName: value }))
-                  }
-                  placeholder="Your full name"
-                />
-              </>
+              <AuthInput
+                label="Full Name"
+                value={authForm.fullName}
+                onChange={(value) =>
+                  setAuthForm((prev) => ({ ...prev, fullName: value }))
+                }
+                placeholder="Your full name"
+              />
             )}
 
             <AuthInput
@@ -239,7 +245,7 @@ function AuthScreen({
               onChange={(value) =>
                 setAuthForm((prev) => ({ ...prev, email: value }))
               }
-              placeholder="admin@rehearsalroom.com"
+              placeholder="you@church.com"
             />
 
             <AuthInput
@@ -253,30 +259,61 @@ function AuthScreen({
             />
 
             {!isLogin && (
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setShowDirectorCode((v) => !v)}
-                  className="text-sm font-bold text-slate-400 hover:text-amber-300 transition-colors"
-                >
-                  {showDirectorCode ? "▼" : "▶"} I'm a Music Director
-                </button>
-                {showDirectorCode && (
-                  <div className="mt-3">
-                    <AuthInput
-                      label="Director Code"
-                      value={authForm.directorCode}
-                      onChange={(value) =>
-                        setAuthForm((prev) => ({ ...prev, directorCode: value }))
-                      }
-                      placeholder="Enter your director code"
-                    />
-                    <p className="mt-2 text-xs text-slate-500">
-                      This code is provided by your church administrator.
-                    </p>
-                  </div>
-                )}
-              </div>
+              <>
+                {/* Director toggle */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDirectorCode((v) => !v);
+                      // Clear both codes when toggling
+                      setAuthForm((prev) => ({ ...prev, directorCode: "", orgName: "", inviteCode: "" }));
+                    }}
+                    className="text-sm font-bold text-slate-400 hover:text-amber-300 transition-colors"
+                  >
+                    {showDirectorCode ? "▼" : "▶"} I'm a Music Director
+                  </button>
+
+                  {showDirectorCode ? (
+                    <div className="mt-3 space-y-3">
+                      <AuthInput
+                        label="Director Code"
+                        value={authForm.directorCode}
+                        onChange={(value) =>
+                          setAuthForm((prev) => ({ ...prev, directorCode: value }))
+                        }
+                        placeholder="Enter your director code"
+                      />
+                      <AuthInput
+                        label="Church / Organization Name"
+                        value={authForm.orgName}
+                        onChange={(value) =>
+                          setAuthForm((prev) => ({ ...prev, orgName: value }))
+                        }
+                        placeholder="e.g. Grace Community Church"
+                      />
+                      <p className="text-xs text-slate-500">
+                        This creates a private workspace for your team. You'll receive an invite code to share with members.
+                      </p>
+                    </div>
+                  ) : (
+                    /* Team member — needs invite code */
+                    <div className="mt-3">
+                      <AuthInput
+                        label="Team Invite Code"
+                        value={authForm.inviteCode}
+                        onChange={(value) =>
+                          setAuthForm((prev) => ({ ...prev, inviteCode: value.toUpperCase() }))
+                        }
+                        placeholder="e.g. ABCD1234"
+                      />
+                      <p className="mt-2 text-xs text-slate-500">
+                        Get this code from your Music Director to join your team's workspace.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
 
             <button

@@ -28,11 +28,12 @@ namespace RehearsalRoomAPI.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register(RegisterRequest request)
         {
+            // ── Basic validation ──────────────────────────────────────────────
             var existingUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == request.Email);
+                .FirstOrDefaultAsync(u => u.Email == request.Email.Trim().ToLower());
 
             if (existingUser != null)
-                return BadRequest("Email already exists.");
+                return BadRequest("An account with this email already exists.");
 
             if (string.IsNullOrWhiteSpace(request.FullName))
                 return BadRequest("Full name is required.");
@@ -40,33 +41,73 @@ namespace RehearsalRoomAPI.Controllers
             if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
                 return BadRequest("Password must be at least 8 characters.");
 
-            // Determine role: director code match → Music Director, else → Team Member
+            // ── Determine role and organization ───────────────────────────────
             var directorCode = _configuration["App:DirectorCode"] ?? "";
-            var role = (!string.IsNullOrWhiteSpace(request.DirectorCode)
-                        && request.DirectorCode.Trim() == directorCode)
-                       ? "Music Director"
-                       : "Team Member";
+            var isDirector = !string.IsNullOrWhiteSpace(request.DirectorCode)
+                             && request.DirectorCode.Trim() == directorCode;
 
+            Organization org;
+
+            if (isDirector)
+            {
+                // Director registers → create a new organization
+                if (string.IsNullOrWhiteSpace(request.OrgName))
+                    return BadRequest("Organization name is required when registering as a Music Director.");
+
+                var inviteCode = GenerateInviteCode();
+
+                // Retry on the rare collision
+                while (await _context.Organizations.AnyAsync(o => o.InviteCode == inviteCode))
+                    inviteCode = GenerateInviteCode();
+
+                org = new Organization
+                {
+                    Name = request.OrgName.Trim(),
+                    InviteCode = inviteCode,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.Organizations.Add(org);
+                await _context.SaveChangesAsync(); // Get the org Id
+            }
+            else
+            {
+                // Team member registers → must supply a valid invite code
+                if (string.IsNullOrWhiteSpace(request.InviteCode))
+                    return BadRequest("An invite code is required. Ask your Music Director for the code.");
+
+                var foundOrg = await _context.Organizations
+                    .FirstOrDefaultAsync(o => o.InviteCode == request.InviteCode.Trim().ToUpper());
+
+                if (foundOrg == null)
+                    return BadRequest("Invalid invite code. Double-check with your Music Director.");
+
+                org = foundOrg;
+            }
+
+            // ── Create user ───────────────────────────────────────────────────
             var user = new User
             {
                 FullName = request.FullName.Trim(),
                 Email = request.Email.Trim().ToLower(),
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                Role = role
+                Role = isDirector ? "Music Director" : "Team Member",
+                OrganizationId = org.Id
             };
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            // Auto-seed attendance records for all upcoming rehearsals
+            // ── Auto-seed attendance for upcoming rehearsals in this org ──────
             var upcomingRehearsals = await _context.RehearsalEvents
-                .Where(e => e.EventDate >= DateTime.UtcNow.Date)
+                .Where(e => e.OrganizationId == org.Id && e.EventDate >= DateTime.UtcNow.Date)
                 .ToListAsync();
 
             if (upcomingRehearsals.Count > 0)
             {
                 var attendanceRecords = upcomingRehearsals.Select(r => new AttendanceRecord
                 {
+                    OrganizationId = org.Id,
                     RehearsalEventId = r.Id,
                     MemberName = user.FullName,
                     Role = user.Role,
@@ -78,31 +119,29 @@ namespace RehearsalRoomAPI.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            return Ok(CreateAuthResponse(user, "User registered successfully"));
+            return Ok(CreateAuthResponse(user, org, "User registered successfully"));
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginRequest request)
         {
             var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == request.Email);
+                .FirstOrDefaultAsync(u => u.Email == request.Email.Trim().ToLower());
 
             if (user == null)
-            {
                 return Unauthorized("Invalid email or password.");
-            }
 
-            var passwordValid = BCrypt.Net.BCrypt.Verify(
-                request.Password,
-                user.PasswordHash
-            );
+            var passwordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
 
             if (!passwordValid)
-            {
                 return Unauthorized("Invalid email or password.");
-            }
 
-            return Ok(CreateAuthResponse(user, "Login successful"));
+            // Load the organization for the invite code
+            var org = user.OrganizationId > 0
+                ? await _context.Organizations.FindAsync(user.OrganizationId)
+                : null;
+
+            return Ok(CreateAuthResponse(user, org, "Login successful"));
         }
 
         [HttpPut("update-name")]
@@ -150,7 +189,17 @@ namespace RehearsalRoomAPI.Controllers
             return Ok(new { message = "Password updated successfully." });
         }
 
-        private object CreateAuthResponse(User user, string message)
+        // ── Helpers ───────────────────────────────────────────────────────────
+
+        private static string GenerateInviteCode()
+        {
+            // 8-character uppercase alphanumeric code (no O, 0, I, L to avoid confusion)
+            const string chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+            var random = new Random();
+            return new string(Enumerable.Range(0, 8).Select(_ => chars[random.Next(chars.Length)]).ToArray());
+        }
+
+        private object CreateAuthResponse(User user, Organization? org, string message)
         {
             return new
             {
@@ -159,35 +208,31 @@ namespace RehearsalRoomAPI.Controllers
                 fullName = user.FullName,
                 email = user.Email,
                 role = user.Role,
-                token = CreateToken(user)
+                organizationId = user.OrganizationId,
+                orgName = org?.Name ?? "",
+                inviteCode = user.Role == "Music Director" ? org?.InviteCode ?? "" : "",
+                token = CreateToken(user, org)
             };
         }
 
-        private string CreateToken(User user)
+        private string CreateToken(User user, Organization? org)
         {
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.FullName),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Role, user.Role)
+                new Claim(ClaimTypes.Role, user.Role),
+                new Claim("OrganizationId", user.OrganizationId.ToString())
             };
 
             var jwtKey = _configuration["Jwt:Key"];
 
             if (string.IsNullOrWhiteSpace(jwtKey))
-            {
                 throw new Exception("JWT Key is missing from appsettings.json.");
-            }
 
-            var key = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwtKey)
-            );
-
-            var credentials = new SigningCredentials(
-                key,
-                SecurityAlgorithms.HmacSha256
-            );
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+            var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
                 issuer: _configuration["Jwt:Issuer"],

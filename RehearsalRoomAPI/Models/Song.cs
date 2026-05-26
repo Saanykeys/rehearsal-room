@@ -2,6 +2,8 @@ public class Song
 {
     public int Id { get; set; }
 
+    public int OrganizationId { get; set; } = 0;
+
     public string Title { get; set; } = "";
 
     public string Artist { get; set; } = "";

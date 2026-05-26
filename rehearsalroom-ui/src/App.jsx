@@ -11,10 +11,23 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState(() => {
     const savedUser = localStorage.getItem("rehearsalRoomUser");
-    return savedUser ? JSON.parse(savedUser) : null;
+    if (!savedUser) return null;
+    const parsed = JSON.parse(savedUser);
+    // If the saved session is from before multi-tenancy (no organizationId), clear it
+    if (!parsed.organizationId) {
+      localStorage.removeItem("rehearsalRoomUser");
+      localStorage.removeItem("rehearsalRoomToken");
+      return null;
+    }
+    return parsed;
   });
 
   const [token, setToken] = useState(() => {
+    // Only keep the token if the user session is still valid
+    const savedUser = localStorage.getItem("rehearsalRoomUser");
+    if (!savedUser) return null;
+    const parsed = JSON.parse(savedUser);
+    if (!parsed.organizationId) return null;
     return localStorage.getItem("rehearsalRoomToken");
   });
 

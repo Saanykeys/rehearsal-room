@@ -819,72 +819,77 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
       <div className="flex min-h-screen flex-col lg:flex-row">
         {/* ── Sidebar ──────────────────────────────────────────────────── */}
         <aside
-          className={`fixed inset-y-0 left-0 z-40 w-64 border-r border-white/10 bg-slate-950 p-5 transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-white/10 bg-slate-950 transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-black uppercase tracking-[0.35em] text-amber-300">
-              Rehearsal Room
-            </p>
-            <button onClick={() => setSidebarOpen(false)} className="lg:hidden">
-              <X />
-            </button>
-          </div>
+          {/* Top: logo + nav (scrollable if needed) */}
+          <div className="flex-1 overflow-y-auto p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-black uppercase tracking-[0.35em] text-amber-300">
+                Rehearsal Room
+              </p>
+              <button onClick={() => setSidebarOpen(false)} className="lg:hidden">
+                <X />
+              </button>
+            </div>
 
-          <nav className="mt-10 space-y-3">
-            {visibleNavItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.name}
-                  onClick={() => {
-                    setActiveTab(item.name);
-                    setSidebarOpen(false);
-                  }}
-                  className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-bold transition-all hover:scale-[1.02] ${
-                    activeTab === item.name
-                      ? "bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20"
-                      : "bg-white/5 text-slate-200 hover:bg-white/10"
-                  }`}
-                >
-                  <Icon size={20} />
-                  {item.name}
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Role switcher in sidebar (mobile) — directors only */}
-          {currentUser?.role === "Music Director" && (
-            <div className="mt-8 lg:hidden">
-              <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">View As</p>
-              <div className="space-y-2">
-                {["Music Director", "Team Member"].map((role) => (
+            <nav className="mt-10 space-y-3">
+              {visibleNavItems.map((item) => {
+                const Icon = item.icon;
+                return (
                   <button
-                    key={role}
-                    onClick={() => { switchRole(role); setSidebarOpen(false); }}
-                    className={`w-full rounded-xl px-4 py-2 text-left text-sm font-bold transition-all ${
-                      currentRole === role
-                        ? "bg-amber-400 text-slate-950"
-                        : "bg-white/5 text-slate-400 hover:bg-white/10"
+                    key={item.name}
+                    onClick={() => {
+                      setActiveTab(item.name);
+                      setSidebarOpen(false);
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-bold transition-all hover:scale-[1.02] ${
+                      activeTab === item.name
+                        ? "bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20"
+                        : "bg-white/5 text-slate-200 hover:bg-white/10"
                     }`}
                   >
-                    {role}
+                    <Icon size={20} />
+                    {item.name}
                   </button>
-                ))}
-              </div>
-            </div>
-          )}
+                );
+              })}
+            </nav>
 
-          {/* Sidebar logout */}
-          <button
-            onClick={onLogout}
-            className="mt-10 flex w-full items-center gap-3 rounded-2xl bg-red-500/10 px-4 py-3 font-bold text-red-300 transition-all hover:bg-red-500/20"
-          >
-            <LogOut size={20} />
-            Logout
-          </button>
+            {/* Role switcher in sidebar (mobile) — directors only */}
+            {currentUser?.role === "Music Director" && (
+              <div className="mt-8 lg:hidden">
+                <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">View As</p>
+                <div className="space-y-2">
+                  {["Music Director", "Team Member"].map((role) => (
+                    <button
+                      key={role}
+                      onClick={() => { switchRole(role); setSidebarOpen(false); }}
+                      className={`w-full rounded-xl px-4 py-2 text-left text-sm font-bold transition-all ${
+                        currentRole === role
+                          ? "bg-amber-400 text-slate-950"
+                          : "bg-white/5 text-slate-400 hover:bg-white/10"
+                      }`}
+                    >
+                      {role}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom: logout — always visible, never pushed off screen */}
+          <div className="border-t border-white/10 p-5">
+            <button
+              onClick={onLogout}
+              className="flex w-full items-center gap-3 rounded-2xl bg-red-500/10 px-4 py-3 font-bold text-red-300 transition-all hover:bg-red-500/20"
+            >
+              <LogOut size={20} />
+              Logout
+            </button>
+          </div>
         </aside>
 
         {/* ── Main content ─────────────────────────────────────────────── */}

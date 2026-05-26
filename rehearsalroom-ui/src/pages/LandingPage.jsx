@@ -45,6 +45,12 @@ export default function LandingPage({ onGetStarted, onLogin }) {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={onLogin}
+              className="rounded-xl px-3 py-2 text-sm font-bold text-slate-600 transition hover:text-slate-400 sm:px-4"
+            >
+              Login
+            </button>
             <a
               href="/waitlist"
               className="rounded-xl bg-amber-400 px-3 py-2 text-sm font-bold text-slate-950 transition hover:bg-amber-300 sm:px-4"

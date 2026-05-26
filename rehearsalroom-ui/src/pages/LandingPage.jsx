@@ -73,7 +73,203 @@ export default function LandingPage({ onGetStarted, onLogin, onGoToDashboard, is
       </nav>
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-5xl px-4 pt-14 pb-10 text-center sm:px-6 sm:pt-20 md:pt-24 md:pb-16">
+      <section className="relative overflow-hidden px-4 pt-14 pb-10 text-center sm:px-6 sm:pt-20 md:pt-24 md:pb-16">
+
+        {/* Worship stage SVG background */}
+        <div className="pointer-events-none absolute inset-0 -z-10">
+          <svg viewBox="0 0 1440 700" xmlns="http://www.w3.org/2000/svg" className="h-full w-full object-cover" preserveAspectRatio="xMidYMid slice">
+            {/* Sky gradient */}
+            <defs>
+              <radialGradient id="ambientGlow" cx="50%" cy="60%" r="55%">
+                <stop offset="0%" stopColor="#b45309" stopOpacity="0.55" />
+                <stop offset="100%" stopColor="#0f172a" stopOpacity="0" />
+              </radialGradient>
+              <radialGradient id="spotLeft" cx="30%" cy="10%" r="40%">
+                <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="#fbbf24" stopOpacity="0" />
+              </radialGradient>
+              <radialGradient id="spotRight" cx="70%" cy="10%" r="40%">
+                <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="#fbbf24" stopOpacity="0" />
+              </radialGradient>
+              <radialGradient id="spotCenter" cx="50%" cy="5%" r="30%">
+                <stop offset="0%" stopColor="#fde68a" stopOpacity="0.45" />
+                <stop offset="100%" stopColor="#fde68a" stopOpacity="0" />
+              </radialGradient>
+              <linearGradient id="stageFloor" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#78350f" stopOpacity="0.6" />
+                <stop offset="100%" stopColor="#0f172a" stopOpacity="0.9" />
+              </linearGradient>
+              <linearGradient id="crossGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#fde68a" />
+                <stop offset="100%" stopColor="#d97706" />
+              </linearGradient>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+              <filter id="softGlow">
+                <feGaussianBlur stdDeviation="8" result="blur" />
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+            </defs>
+
+            {/* Deep dark background */}
+            <rect width="1440" height="700" fill="#050d1a" />
+
+            {/* Ambient amber glow from stage */}
+            <ellipse cx="720" cy="560" rx="700" ry="300" fill="url(#ambientGlow)" />
+
+            {/* Spotlight cones from top-left */}
+            <polygon points="120,0 80,0 340,560 380,560" fill="#fbbf24" fillOpacity="0.06" />
+            <polygon points="220,0 180,0 420,560 460,560" fill="#fbbf24" fillOpacity="0.05" />
+            {/* Spotlight cones from top-right */}
+            <polygon points="1320,0 1360,0 1100,560 1060,560" fill="#fbbf24" fillOpacity="0.06" />
+            <polygon points="1220,0 1260,0 1020,560 980,560" fill="#fbbf24" fillOpacity="0.05" />
+            {/* Center spotlight */}
+            <polygon points="660,0 780,0 820,560 620,560" fill="#fde68a" fillOpacity="0.07" />
+
+            {/* Spotlight radials */}
+            <ellipse cx="420" cy="0" rx="260" ry="180" fill="url(#spotLeft)" />
+            <ellipse cx="1020" cy="0" rx="260" ry="180" fill="url(#spotRight)" />
+            <ellipse cx="720" cy="0" rx="200" ry="150" fill="url(#spotCenter)" />
+
+            {/* Stage platform */}
+            <ellipse cx="720" cy="580" rx="640" ry="60" fill="#1e1208" />
+            <rect x="80" y="540" width="1280" height="120" fill="url(#stageFloor)" rx="8" />
+            {/* Stage edge highlight */}
+            <rect x="80" y="538" width="1280" height="4" fill="#d97706" fillOpacity="0.5" rx="2" />
+
+            {/* Stage step edges */}
+            <rect x="140" y="600" width="1160" height="40" fill="#0f172a" fillOpacity="0.6" rx="4" />
+            <rect x="140" y="638" width="1160" height="3" fill="#92400e" fillOpacity="0.4" />
+
+            {/* Cross — center stage, glowing */}
+            <g filter="url(#softGlow)" opacity="0.95">
+              {/* Cross vertical */}
+              <rect x="706" y="240" width="28" height="280" fill="url(#crossGrad)" rx="4" />
+              {/* Cross horizontal */}
+              <rect x="640" y="300" width="160" height="24" fill="url(#crossGrad)" rx="4" />
+              {/* Cross glow halo */}
+              <ellipse cx="720" cy="380" rx="70" ry="120" fill="#fbbf24" fillOpacity="0.1" />
+            </g>
+
+            {/* Speaker stacks — left */}
+            <rect x="140" y="420" width="50" height="130" fill="#111827" rx="4" />
+            <rect x="143" y="423" width="44" height="60" fill="#1f2937" rx="2" />
+            <circle cx="165" cy="490" r="16" fill="#0f172a" stroke="#374151" strokeWidth="1.5" />
+            <circle cx="165" cy="490" r="8" fill="#1f2937" />
+            <rect x="143" y="510" width="44" height="35" fill="#1f2937" rx="2" />
+            {/* Speaker stacks — right */}
+            <rect x="1250" y="420" width="50" height="130" fill="#111827" rx="4" />
+            <rect x="1253" y="423" width="44" height="60" fill="#1f2937" rx="2" />
+            <circle cx="1275" cy="490" r="16" fill="#0f172a" stroke="#374151" strokeWidth="1.5" />
+            <circle cx="1275" cy="490" r="8" fill="#1f2937" />
+            <rect x="1253" y="510" width="44" height="35" fill="#1f2937" rx="2" />
+
+            {/* Moving heads / par cans — top rig */}
+            {[180, 360, 540, 720, 900, 1080, 1260].map((x, i) => (
+              <g key={i}>
+                <rect x={x - 14} y="30" width="28" height="14" fill="#1f2937" rx="3" />
+                <ellipse cx={x} cy="44" rx="10" ry="6" fill={i % 2 === 0 ? "#fbbf24" : "#fb923c"} fillOpacity="0.9" filter="url(#glow)" />
+                <line x1={x} y1="44" x2={x} y2="30" stroke="#374151" strokeWidth="2" />
+              </g>
+            ))}
+
+            {/* Truss bar */}
+            <rect x="140" y="26" width="1160" height="10" fill="#374151" rx="3" />
+
+            {/* Band silhouettes */}
+            {/* Lead vocalist — center */}
+            <g fill="#0f172a" opacity="0.85">
+              <ellipse cx="720" cy="500" rx="14" ry="14" /> {/* head */}
+              <path d="M706 514 Q720 512 734 514 L740 545 Q720 548 700 545 Z" /> {/* body */}
+              <line x1="700" y1="530" x2="682" y2="545" stroke="#0f172a" strokeWidth="6" strokeLinecap="round" /> {/* left arm - mic */}
+              <line x1="740" y1="530" x2="755" y2="545" stroke="#0f172a" strokeWidth="6" strokeLinecap="round" /> {/* right arm */}
+              <line x1="710" y1="545" x2="706" y2="570" stroke="#0f172a" strokeWidth="7" strokeLinecap="round" /> {/* left leg */}
+              <line x1="730" y1="545" x2="734" y2="570" stroke="#0f172a" strokeWidth="7" strokeLinecap="round" /> {/* right leg */}
+              {/* mic stand */}
+              <line x1="682" y1="545" x2="680" y2="520" stroke="#0f172a" strokeWidth="3" strokeLinecap="round" />
+              <circle cx="679" cy="518" r="3" fill="#0f172a" />
+            </g>
+
+            {/* Guitarist — left */}
+            <g fill="#0f172a" opacity="0.8">
+              <ellipse cx="560" cy="500" rx="12" ry="12" />
+              <path d="M548 512 Q560 510 572 512 L577 540 Q560 543 543 540 Z" />
+              <line x1="543" y1="525" x2="525" y2="535" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
+              <line x1="577" y1="525" x2="592" y2="535" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
+              <line x1="551" y1="540" x2="548" y2="565" stroke="#0f172a" strokeWidth="6" strokeLinecap="round" />
+              <line x1="569" y1="540" x2="572" y2="565" stroke="#0f172a" strokeWidth="6" strokeLinecap="round" />
+              {/* guitar body */}
+              <ellipse cx="530" cy="530" rx="10" ry="13" fill="#0f172a" opacity="0.9" />
+            </g>
+
+            {/* Guitarist — right */}
+            <g fill="#0f172a" opacity="0.8">
+              <ellipse cx="880" cy="500" rx="12" ry="12" />
+              <path d="M868 512 Q880 510 892 512 L897 540 Q880 543 863 540 Z" />
+              <line x1="863" y1="525" x2="845" y2="535" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
+              <line x1="897" y1="525" x2="912" y2="535" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
+              <line x1="871" y1="540" x2="868" y2="565" stroke="#0f172a" strokeWidth="6" strokeLinecap="round" />
+              <line x1="889" y1="540" x2="892" y2="565" stroke="#0f172a" strokeWidth="6" strokeLinecap="round" />
+              <ellipse cx="910" cy="530" rx="10" ry="13" fill="#0f172a" opacity="0.9" />
+            </g>
+
+            {/* Drummer — far left back */}
+            <g fill="#0f172a" opacity="0.75">
+              <ellipse cx="400" cy="505" rx="11" ry="11" />
+              <path d="M389 516 Q400 514 411 516 L415 540 Q400 543 385 540 Z" />
+              {/* drum kit */}
+              <ellipse cx="390" cy="540" rx="18" ry="6" fill="#0f172a" />
+              <ellipse cx="415" cy="540" rx="14" ry="5" fill="#0f172a" />
+              <ellipse cx="400" cy="550" rx="22" ry="8" fill="#0f172a" />
+            </g>
+
+            {/* Keys player — far right back */}
+            <g fill="#0f172a" opacity="0.75">
+              <ellipse cx="1040" cy="505" rx="11" ry="11" />
+              <path d="M1029 516 Q1040 514 1051 516 L1055 540 Q1040 543 1025 540 Z" />
+              {/* keyboard */}
+              <rect x="1020" y="535" width="50" height="10" fill="#0f172a" rx="2" />
+              <rect x="1025" y="530" width="4" height="8" fill="#0f172a" />
+              <rect x="1031" y="530" width="4" height="8" fill="#0f172a" />
+              <rect x="1040" y="530" width="4" height="8" fill="#0f172a" />
+              <rect x="1046" y="530" width="4" height="8" fill="#0f172a" />
+              <rect x="1055" y="530" width="4" height="8" fill="#0f172a" />
+              {/* keyboard stand */}
+              <line x1="1022" y1="545" x2="1018" y2="565" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
+              <line x1="1068" y1="545" x2="1072" y2="565" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
+            </g>
+
+            {/* Crowd silhouette — back of stage area / congregation */}
+            <g fill="#0a1020" opacity="0.7">
+              {/* Row of heads */}
+              {[200, 260, 310, 370, 430, 490, 560, 620, 660, 780, 820, 870, 940, 1000, 1060, 1110, 1170, 1230].map((x, i) => (
+                <ellipse key={i} cx={x} cy={650 + (i % 3) * 6} rx="18" ry="20" />
+              ))}
+              {/* Second row */}
+              {[230, 290, 340, 400, 460, 525, 595, 640, 700, 760, 800, 850, 910, 975, 1035, 1085, 1145, 1205, 1255].map((x, i) => (
+                <ellipse key={i} cx={x} cy={668 + (i % 2) * 5} rx="16" ry="18" />
+              ))}
+            </g>
+
+            {/* Floor light reflections */}
+            <ellipse cx="560" cy="560" rx="40" ry="12" fill="#fbbf24" fillOpacity="0.12" />
+            <ellipse cx="720" cy="555" rx="50" ry="14" fill="#fde68a" fillOpacity="0.15" />
+            <ellipse cx="880" cy="560" rx="40" ry="12" fill="#fbbf24" fillOpacity="0.12" />
+
+            {/* Dark overlay gradient for text readability */}
+            <linearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#050d1a" stopOpacity="0.82" />
+              <stop offset="50%" stopColor="#050d1a" stopOpacity="0.55" />
+              <stop offset="100%" stopColor="#050d1a" stopOpacity="0.75" />
+            </linearGradient>
+            <rect width="1440" height="700" fill="url(#topFade)" />
+          </svg>
+        </div>
+
+        <div className="relative mx-auto max-w-5xl">
         <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0}>
           <span className="inline-block rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.25em] text-amber-300 sm:tracking-[0.3em]">
             Built for worship teams
@@ -134,6 +330,7 @@ export default function LandingPage({ onGetStarted, onLogin, onGoToDashboard, is
             </span>
           ))}
         </motion.div>
+        </div>
       </section>
 
       {/* ── Hero UI mockup ────────────────────────────────────────────────── */}

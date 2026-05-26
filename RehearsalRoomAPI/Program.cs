@@ -70,6 +70,9 @@ var allowedOrigins = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:5175",
+    // Production — both www and apex in case the env var is missing/wrong
+    "https://rehearsalroom.org",
+    "https://www.rehearsalroom.org",
 };
 foreach (var url in frontendUrls) allowedOrigins.Add(url);
 

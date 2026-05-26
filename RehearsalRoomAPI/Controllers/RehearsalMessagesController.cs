@@ -41,19 +41,24 @@ namespace RehearsalRoomAPI.Controllers
             if (!rehearsalExists)
                 return NotFound("Rehearsal not found.");
 
-            var messages = await _context.RehearsalMessages
+            var userId = GetUserId();
+
+            // Materialize first, then project isOwn in memory
+            // (EF Core cannot translate GetUserId() to SQL)
+            var rawMessages = await _context.RehearsalMessages
                 .Where(m => m.RehearsalEventId == rehearsalId && m.OrganizationId == orgId)
                 .OrderBy(m => m.CreatedAt)
-                .Select(m => new
-                {
-                    m.Id,
-                    m.AuthorId,
-                    m.AuthorName,
-                    m.Body,
-                    m.CreatedAt,
-                    isOwn = m.AuthorId == GetUserId()
-                })
                 .ToListAsync();
+
+            var messages = rawMessages.Select(m => new
+            {
+                m.Id,
+                m.AuthorId,
+                m.AuthorName,
+                m.Body,
+                m.CreatedAt,
+                isOwn = m.AuthorId == userId
+            }).ToList();
 
             return Ok(messages);
         }

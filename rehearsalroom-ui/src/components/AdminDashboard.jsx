@@ -458,7 +458,13 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
           songIds: rehearsalForm.songIds,
         }),
       });
-      if (!res.ok) throw new Error("Failed to save rehearsal.");
+      if (!res.ok) {
+        const errText = await res.text();
+        let errMsg = "Could not save rehearsal.";
+        try { errMsg = JSON.parse(errText)?.message || JSON.parse(errText)?.title || errText || errMsg; } catch { errMsg = errText || errMsg; }
+        setRehearsalError(errMsg);
+        return;
+      }
       const saved = await res.json();
       if (editingRehearsalId) {
         setRehearsals((prev) => prev.map((r) => (r.id === editingRehearsalId ? saved : r)));
@@ -470,7 +476,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
       closeRehearsalForm();
     } catch (err) {
       console.error(err);
-      setRehearsalError("Could not save rehearsal.");
+      setRehearsalError("Network error — check that the API server is running.");
     }
   };
 

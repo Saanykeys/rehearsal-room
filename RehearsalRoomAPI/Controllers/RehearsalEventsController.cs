@@ -57,6 +57,9 @@ namespace RehearsalRoomAPI.Controllers
 
             rehearsalEvent.OrganizationId = orgId;
             rehearsalEvent.CreatedAt = DateTime.UtcNow;
+            // Npgsql 6+ requires DateTime.Kind = Utc for timestamp columns.
+            // JSON deserialization produces Kind=Unspecified; normalize here.
+            rehearsalEvent.EventDate = DateTime.SpecifyKind(rehearsalEvent.EventDate, DateTimeKind.Utc);
             _context.RehearsalEvents.Add(rehearsalEvent);
             await _context.SaveChangesAsync();
 
@@ -106,7 +109,7 @@ namespace RehearsalRoomAPI.Controllers
             if (rehearsalEvent == null) return NotFound();
 
             rehearsalEvent.Title = updatedEvent.Title;
-            rehearsalEvent.EventDate = updatedEvent.EventDate;
+            rehearsalEvent.EventDate = DateTime.SpecifyKind(updatedEvent.EventDate, DateTimeKind.Utc);
             rehearsalEvent.EventTime = updatedEvent.EventTime;
             rehearsalEvent.Location = updatedEvent.Location;
             rehearsalEvent.Notes = updatedEvent.Notes;

@@ -2285,51 +2285,13 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
 
           {/* ── Waitlist Tab ─────────────────────────────────────────────── */}
           {activeTab === "Waitlist" && (
-            <div className="mt-8 space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-black">Waitlist Signups</h2>
-                  <p className="text-sm text-slate-400 mt-1">{waitlistEntries.length} people waiting</p>
-                </div>
-                <button
-                  onClick={loadWaitlist}
-                  className="rounded-2xl bg-white/10 px-4 py-2 text-sm font-bold hover:bg-white/15 transition-all"
-                >
-                  Refresh
-                </button>
-              </div>
-
-              {waitlistEntries.length === 0 ? (
-                <div className="rounded-3xl border border-white/10 bg-white/5 p-12 text-center">
-                  <p className="text-slate-400 font-medium">No signups yet. Share your waitlist link!</p>
-                  <p className="text-amber-400 font-bold mt-2 text-sm">www.rehearsalroom.org/waitlist</p>
-                </div>
-              ) : (
-                <div className="rounded-3xl border border-white/10 bg-white/5 overflow-hidden">
-                  <div className="grid grid-cols-4 gap-4 px-6 py-3 border-b border-white/10 text-xs font-black uppercase tracking-widest text-slate-500">
-                    <span>Name</span>
-                    <span>Email</span>
-                    <span>Church</span>
-                    <span>Role</span>
-                  </div>
-                  {waitlistEntries.map((entry) => (
-                    <div key={entry.id} className="grid grid-cols-4 gap-4 px-6 py-4 border-b border-white/5 hover:bg-white/5 transition-all">
-                      <span className="font-bold text-white truncate">{entry.fullName}</span>
-                      <span className="text-slate-400 text-sm truncate">{entry.email}</span>
-                      <span className="text-slate-400 text-sm truncate">{entry.churchName}</span>
-                      <span className={`text-xs font-black px-2 py-1 rounded-lg w-fit ${
-                        entry.role === "Music Director" ? "bg-amber-400/20 text-amber-300" : "bg-blue-400/20 text-blue-300"
-                      }`}>{entry.role}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="rounded-3xl border border-amber-400/20 bg-amber-400/5 p-5">
-                <p className="text-sm font-bold text-amber-300">Share your waitlist</p>
-                <p className="text-sm text-slate-400 mt-1">Send people to <span className="text-white font-bold">www.rehearsalroom.org/waitlist</span> to sign up.</p>
-              </div>
-            </div>
+            <WaitlistPanel
+              entries={waitlistEntries}
+              onRefresh={loadWaitlist}
+              token={token}
+              currentUser={currentUser}
+              onEntriesChange={setWaitlistEntries}
+            />
           )}
 
           {/* ── Settings Tab ────────────────────────────────────────────── */}
@@ -2670,6 +2632,126 @@ function urlBase64ToUint8Array(base64String) {
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = atob(base64);
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+// ── WaitlistPanel ─────────────────────────────────────────────────────────────
+
+const ADMIN_EMAIL = "rahsaanhall.swe@gmail.com";
+
+function WaitlistPanel({ entries, onRefresh, token, currentUser, onEntriesChange }) {
+  const [approvingId, setApprovingId] = useState(null);
+  const [approveResult, setApproveResult] = useState({}); // id -> { success, message }
+  const isSuperAdmin = currentUser?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
+  const handleApprove = async (entry) => {
+    setApprovingId(entry.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/Waitlist/${entry.id}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = { message: text }; }
+
+      if (res.ok) {
+        setApproveResult((prev) => ({ ...prev, [entry.id]: { success: true, message: `Code sent to ${entry.email}` } }));
+        // Update local state to reflect approval
+        onEntriesChange((prev) =>
+          prev.map((e) => e.id === entry.id ? { ...e, isApproved: true, inviteCodeUsed: false } : e)
+        );
+      } else {
+        setApproveResult((prev) => ({ ...prev, [entry.id]: { success: false, message: data.message || "Failed to approve." } }));
+      }
+    } catch {
+      setApproveResult((prev) => ({ ...prev, [entry.id]: { success: false, message: "Network error." } }));
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  return (
+    <div className="mt-8 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-black">Waitlist</h2>
+          <p className="text-sm text-slate-400 mt-1">{entries.length} {entries.length === 1 ? "person" : "people"} signed up</p>
+        </div>
+        <button onClick={onRefresh} className="rounded-2xl bg-white/10 px-4 py-2 text-sm font-bold hover:bg-white/15 transition-all">
+          Refresh
+        </button>
+      </div>
+
+      {!isSuperAdmin && (
+        <div className="rounded-3xl border border-amber-400/20 bg-amber-400/5 p-6 text-center">
+          <p className="font-bold text-amber-300">Admin access only</p>
+          <p className="text-sm text-slate-400 mt-1">Waitlist management is restricted to the super admin.</p>
+        </div>
+      )}
+
+      {isSuperAdmin && entries.length === 0 && (
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-12 text-center">
+          <p className="text-slate-400 font-medium">No signups yet.</p>
+          <p className="text-amber-400 font-bold mt-2 text-sm">/waitlist</p>
+        </div>
+      )}
+
+      {isSuperAdmin && entries.length > 0 && (
+        <div className="space-y-3">
+          {entries.map((entry) => {
+            const result = approveResult[entry.id];
+            const isApproving = approvingId === entry.id;
+            const alreadyApproved = entry.isApproved && !entry.inviteCodeUsed;
+            const codeUsed = entry.isApproved && entry.inviteCodeUsed;
+
+            return (
+              <div key={entry.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-black text-white">{entry.fullName}</p>
+                    <span className={`text-xs font-black px-2 py-0.5 rounded-lg ${
+                      entry.role === "Music Director" ? "bg-amber-400/20 text-amber-300" : "bg-blue-400/20 text-blue-300"
+                    }`}>{entry.role}</span>
+                    {codeUsed && (
+                      <span className="text-xs font-black px-2 py-0.5 rounded-lg bg-emerald-400/20 text-emerald-300">Registered</span>
+                    )}
+                    {alreadyApproved && (
+                      <span className="text-xs font-black px-2 py-0.5 rounded-lg bg-blue-400/20 text-blue-300">Code Sent</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-400 mt-0.5">{entry.email}</p>
+                  <p className="text-sm text-slate-500">{entry.churchName}</p>
+                  {result && (
+                    <p className={`text-xs font-bold mt-1 ${result.success ? "text-emerald-400" : "text-red-400"}`}>
+                      {result.success ? "✓" : "✗"} {result.message}
+                    </p>
+                  )}
+                </div>
+                <div className="shrink-0">
+                  {codeUsed ? (
+                    <span className="text-xs text-slate-500 font-bold">✓ Done</span>
+                  ) : (
+                    <button
+                      onClick={() => handleApprove(entry)}
+                      disabled={isApproving}
+                      className="rounded-xl bg-amber-400 px-4 py-2 text-sm font-black text-slate-950 hover:bg-amber-300 transition-all disabled:opacity-50"
+                    >
+                      {isApproving ? "Sending…" : alreadyApproved ? "Resend Code" : "Approve →"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-amber-400/20 bg-amber-400/5 p-4">
+        <p className="text-sm font-bold text-amber-300">How approval works</p>
+        <p className="text-sm text-slate-400 mt-1">Click <strong className="text-white">Approve</strong> to generate a unique, single-use director code and email it directly to that person. The code expires in 7 days. Once they register, it's marked as used automatically.</p>
+      </div>
+    </div>
+  );
 }
 
 // ── Reusable sub-components ───────────────────────────────────────────────────────

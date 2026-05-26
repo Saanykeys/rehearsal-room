@@ -46,9 +46,37 @@ namespace RehearsalRoomAPI.Controllers
                 return BadRequest("Password must be at least 8 characters.");
 
             // ── Determine role and organization ───────────────────────────────
-            var directorCode = _configuration["App:DirectorCode"] ?? "";
-            var isDirector = !string.IsNullOrWhiteSpace(request.DirectorCode)
-                             && request.DirectorCode.Trim() == directorCode;
+            var superAdminCode = _configuration["App:DirectorCode"] ?? "";
+            var submittedCode = request.DirectorCode?.Trim() ?? "";
+
+            // Check hardcoded super-admin code first, then one-time waitlist codes
+            bool isDirector = false;
+            WaitlistEntry? approvedWaitlistEntry = null;
+
+            if (!string.IsNullOrWhiteSpace(submittedCode))
+            {
+                if (submittedCode == superAdminCode)
+                {
+                    isDirector = true;
+                }
+                else
+                {
+                    // Check the waitlist table for a valid one-time code
+                    approvedWaitlistEntry = await _context.WaitlistEntries
+                        .FirstOrDefaultAsync(w =>
+                            w.DirectorInviteCode == submittedCode &&
+                            w.IsApproved &&
+                            !w.InviteCodeUsed &&
+                            w.InviteCodeExpiry != null &&
+                            w.InviteCodeExpiry > DateTime.UtcNow);
+
+                    if (approvedWaitlistEntry != null)
+                        isDirector = true;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(submittedCode) && !isDirector)
+                return BadRequest("Invalid or expired director code.");
 
             Organization org;
 
@@ -101,6 +129,13 @@ namespace RehearsalRoomAPI.Controllers
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
+
+            // ── Mark one-time director code as used ───────────────────────────
+            if (approvedWaitlistEntry != null)
+            {
+                approvedWaitlistEntry.InviteCodeUsed = true;
+                await _context.SaveChangesAsync();
+            }
 
             // ── Auto-seed attendance ──────────────────────────────────────────
             var upcomingRehearsals = await _context.RehearsalEvents

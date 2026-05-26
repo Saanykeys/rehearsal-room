@@ -150,6 +150,12 @@ using (var scope = app.Services.CreateScope())
             // Password reset
             @"ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""PasswordResetToken"" TEXT NULL",
             @"ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""PasswordResetTokenExpiry"" TIMESTAMPTZ NULL",
+            // Waitlist approval
+            @"ALTER TABLE ""WaitlistEntries"" ADD COLUMN IF NOT EXISTS ""IsApproved"" BOOLEAN NOT NULL DEFAULT FALSE",
+            @"ALTER TABLE ""WaitlistEntries"" ADD COLUMN IF NOT EXISTS ""DirectorInviteCode"" TEXT NULL",
+            @"ALTER TABLE ""WaitlistEntries"" ADD COLUMN IF NOT EXISTS ""InviteCodeExpiry"" TIMESTAMPTZ NULL",
+            @"ALTER TABLE ""WaitlistEntries"" ADD COLUMN IF NOT EXISTS ""InviteCodeUsed"" BOOLEAN NOT NULL DEFAULT FALSE",
+            @"ALTER TABLE ""WaitlistEntries"" ADD COLUMN IF NOT EXISTS ""ApprovedAt"" TIMESTAMPTZ NULL",
         })
         {
             try { db.Database.ExecuteSqlRaw(stmt); } catch { /* column already exists */ }
@@ -214,14 +220,29 @@ using (var scope = app.Services.CreateScope())
         ");
         db.Database.ExecuteSqlRaw(@"
             CREATE TABLE IF NOT EXISTS WaitlistEntries (
-                Id          INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                Email       TEXT    NOT NULL DEFAULT '',
-                FullName    TEXT    NOT NULL DEFAULT '',
-                ChurchName  TEXT    NOT NULL DEFAULT '',
-                Role        TEXT    NOT NULL DEFAULT '',
-                CreatedAt   TEXT    NOT NULL DEFAULT ''
+                Id                 INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                Email              TEXT    NOT NULL DEFAULT '',
+                FullName           TEXT    NOT NULL DEFAULT '',
+                ChurchName         TEXT    NOT NULL DEFAULT '',
+                Role               TEXT    NOT NULL DEFAULT '',
+                CreatedAt          TEXT    NOT NULL DEFAULT '',
+                IsApproved         INTEGER NOT NULL DEFAULT 0,
+                DirectorInviteCode TEXT    NULL,
+                InviteCodeExpiry   TEXT    NULL,
+                InviteCodeUsed     INTEGER NOT NULL DEFAULT 0,
+                ApprovedAt         TEXT    NULL
             )
         ");
+        // Safety net: add new columns to existing WaitlistEntries rows
+        foreach (var stmt in new[]
+        {
+            "ALTER TABLE WaitlistEntries ADD COLUMN IsApproved INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE WaitlistEntries ADD COLUMN DirectorInviteCode TEXT NULL",
+            "ALTER TABLE WaitlistEntries ADD COLUMN InviteCodeExpiry TEXT NULL",
+            "ALTER TABLE WaitlistEntries ADD COLUMN InviteCodeUsed INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE WaitlistEntries ADD COLUMN ApprovedAt TEXT NULL",
+        })
+        { try { db.Database.ExecuteSqlRaw(stmt); } catch { } }
     }
 }
 

@@ -400,6 +400,14 @@ function AuthScreen({
                       <p className="mt-2 text-xs text-slate-500">
                         Get this code from your Music Director to join your team's workspace.
                       </p>
+                      <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/5 px-4 py-3">
+                        <p className="text-xs font-bold text-amber-300">Director not set up yet?</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Your Music Director needs to register first. Ask them to{" "}
+                          <a href="/waitlist" className="text-amber-400 hover:underline font-bold">join the waitlist</a>
+                          {" "}— once approved, they'll get a code to set up your team.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>

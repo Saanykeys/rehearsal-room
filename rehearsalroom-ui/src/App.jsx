@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import rehearsalLogo from "./assets/rehearsalroom-logo.png";
 import AdminDashboard from "./components/AdminDashboard";
 import LandingPage from "./pages/LandingPage";
@@ -43,6 +43,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState(null);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [googlePendingUser, setGooglePendingUser] = useState(null); // { googleId, email, fullName }
 
   const [authForm, setAuthForm] = useState({
     fullName: "",
@@ -136,6 +137,48 @@ export default function App() {
     }
   };
 
+  const handleGoogleLogin = async (credential) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/Auth/google-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential }),
+      });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = { message: text }; }
+
+      if (!res.ok) {
+        setAuthError(data.message || "Google sign-in failed.");
+        return;
+      }
+
+      // New user — needs invite code
+      if (data.requiresInviteCode) {
+        // Store the original JWT credential so we can re-send it with the invite code
+        setGooglePendingUser({ credential, email: data.email, fullName: data.fullName });
+        setShowAuth(false);
+        return;
+      }
+
+      // Existing user — log them in
+      const userToken = data.token || "";
+      const user = {
+        id: data.id, fullName: data.fullName, email: data.email,
+        role: data.role, organizationId: data.organizationId,
+        orgName: data.orgName, inviteCode: data.inviteCode,
+      };
+      localStorage.setItem("rehearsalRoomToken", userToken);
+      localStorage.setItem("rehearsalRoomUser", JSON.stringify(user));
+      setToken(userToken);
+      setCurrentUser(user);
+      setShowAuth(false);
+      setShowDashboard(true);
+    } catch {
+      setAuthError("Could not connect to the server.");
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem("rehearsalRoomToken");
     localStorage.removeItem("rehearsalRoomUser");
@@ -190,6 +233,31 @@ export default function App() {
     return <ForgotPasswordScreen onBack={() => setShowForgotPassword(false)} apiBase={API_BASE} />;
   }
 
+  // Google sign-in — new user needs to enter invite code
+  if (googlePendingUser) {
+    return (
+      <GoogleInviteScreen
+        googleUser={googlePendingUser}
+        apiBase={API_BASE}
+        onSuccess={(data) => {
+          const userToken = data.token || "";
+          const user = {
+            id: data.id, fullName: data.fullName, email: data.email,
+            role: data.role, organizationId: data.organizationId,
+            orgName: data.orgName, inviteCode: data.inviteCode,
+          };
+          localStorage.setItem("rehearsalRoomToken", userToken);
+          localStorage.setItem("rehearsalRoomUser", JSON.stringify(user));
+          setToken(userToken);
+          setCurrentUser(user);
+          setGooglePendingUser(null);
+          setShowDashboard(true);
+        }}
+        onBack={() => setGooglePendingUser(null)}
+      />
+    );
+  }
+
   // Auth screen (login / register)
   if (!isLoggedIn && showAuth) {
     return (
@@ -203,6 +271,7 @@ export default function App() {
         handleAuthSubmit={handleAuthSubmit}
         onBack={() => setShowAuth(false)}
         onForgotPassword={() => setShowForgotPassword(true)}
+        onGoogleLogin={handleGoogleLogin}
       />
     );
   }
@@ -224,6 +293,24 @@ export default function App() {
 }
 
 
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+
+function GoogleButton({ onLogin }) {
+  useEffect(() => {
+    if (!window.google || !GOOGLE_CLIENT_ID) return;
+    window.google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: (response) => onLogin(response.credential),
+    });
+    window.google.accounts.id.renderButton(
+      document.getElementById("google-signin-btn"),
+      { theme: "filled_black", size: "large", width: 340, text: "continue_with" }
+    );
+  }, [onLogin]);
+
+  return <div id="google-signin-btn" className="flex justify-center mt-1" />;
+}
+
 function AuthScreen({
   authMode,
   setAuthMode,
@@ -234,6 +321,7 @@ function AuthScreen({
   handleAuthSubmit,
   onBack,
   onForgotPassword,
+  onGoogleLogin,
 }) {
   const [showDirectorCode, setShowDirectorCode] = useState(false);
   const isLogin = authMode === "login";
@@ -422,6 +510,23 @@ function AuthScreen({
               {authLoading ? "Please wait..." : isLogin ? "Login" : "Register"}
             </button>
 
+            {/* Google Sign-In — for team members only */}
+            {(isLogin || !isDirector) && (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-white/10" />
+                  <span className="text-xs text-slate-500 font-bold">or</span>
+                  <div className="h-px flex-1 bg-white/10" />
+                </div>
+                <GoogleButton onLogin={onGoogleLogin} />
+                {!isLogin && (
+                  <p className="text-center text-xs text-slate-500">
+                    Google sign-in is for team members joining an existing org.
+                  </p>
+                )}
+              </>
+            )}
+
             <button
               type="button"
               onClick={() => {
@@ -482,6 +587,103 @@ function AuthInput({ label, value, onChange, placeholder, type = "text" }) {
         )}
       </div>
     </label>
+  );
+}
+
+function GoogleInviteScreen({ googleUser, apiBase, onSuccess, onBack }) {
+  const [inviteCode, setInviteCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!inviteCode.trim()) return;
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch(`${apiBase}/api/Auth/google-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential: googleUser.credential, inviteCode: inviteCode.trim().toUpperCase() }),
+      });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = { message: text }; }
+
+      if (res.ok && !data.requiresInviteCode) {
+        onSuccess(data);
+      } else {
+        setError(data.message || "Invalid invite code. Check with your Music Director.");
+      }
+    } catch {
+      setError("Could not connect to the server.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 px-5 text-white">
+      <div className="w-full max-w-md">
+        <div className="rounded-3xl border border-white/10 bg-slate-950/80 p-7 shadow-2xl backdrop-blur">
+          <button onClick={onBack} className="mb-6 rounded-xl bg-white/10 px-4 py-2 text-sm font-bold text-slate-200 hover:bg-white/15 transition-colors">
+            ← Back
+          </button>
+
+          <div className="flex items-center gap-3 mb-5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400/10">
+              <svg className="h-5 w-5 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+            </div>
+            <div>
+              <p className="font-black text-white">Signed in as {googleUser.fullName}</p>
+              <p className="text-xs text-slate-400">{googleUser.email}</p>
+            </div>
+          </div>
+
+          <p className="text-xs font-black uppercase tracking-[0.3em] text-amber-300">One more step</p>
+          <h2 className="mt-2 text-2xl font-black">Enter your team invite code</h2>
+          <p className="mt-2 text-sm text-slate-400">
+            Ask your Music Director for your team's invite code to join their workspace.
+          </p>
+
+          {error && (
+            <div className="mt-4 rounded-2xl bg-red-500/20 px-4 py-3 text-sm font-bold text-red-200">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+            <label>
+              <span className="text-sm font-bold text-slate-200">Team Invite Code</span>
+              <input
+                type="text"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                placeholder="e.g. ABCD1234"
+                required
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-amber-400 font-mono tracking-widest"
+              />
+            </label>
+            <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 px-4 py-3">
+              <p className="text-xs font-bold text-amber-300">Director not set up yet?</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Ask them to <a href="/waitlist" className="text-amber-400 hover:underline font-bold">join the waitlist</a> — once approved they'll set up your team.
+              </p>
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-2xl bg-amber-400 px-5 py-3 font-black text-slate-950 transition hover:scale-[1.02] disabled:opacity-60"
+            >
+              {loading ? "Joining…" : "Join Team →"}
+            </button>
+          </form>
+        </div>
+      </div>
+    </main>
   );
 }
 

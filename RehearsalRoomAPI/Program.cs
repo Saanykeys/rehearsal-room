@@ -147,6 +147,8 @@ using (var scope = app.Services.CreateScope())
             // Email verification — existing users default to verified so they are not locked out
             @"ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""IsEmailVerified"" BOOLEAN NOT NULL DEFAULT TRUE",
             @"ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""EmailVerificationToken"" TEXT NULL",
+            // Google Sign-In
+            @"ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""GoogleId"" TEXT NULL",
             // Password reset
             @"ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""PasswordResetToken"" TEXT NULL",
             @"ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""PasswordResetTokenExpiry"" TIMESTAMPTZ NULL",
@@ -191,6 +193,8 @@ using (var scope = app.Services.CreateScope())
             // Email verification — existing users default to verified
             "ALTER TABLE Users ADD COLUMN IsEmailVerified INTEGER NOT NULL DEFAULT 1",
             "ALTER TABLE Users ADD COLUMN EmailVerificationToken TEXT NULL",
+            // Google Sign-In
+            "ALTER TABLE Users ADD COLUMN GoogleId TEXT NULL",
             // Password reset
             "ALTER TABLE Users ADD COLUMN PasswordResetToken TEXT NULL",
             "ALTER TABLE Users ADD COLUMN PasswordResetTokenExpiry TEXT NULL",

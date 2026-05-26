@@ -31,6 +31,11 @@ namespace RehearsalRoomAPI.Models
         public string? EmailVerificationToken { get; set; }
 
         /// <summary>
+        /// Google account subject ID — set when the user signs in with Google.
+        /// </summary>
+        public string? GoogleId { get; set; }
+
+        /// <summary>
         /// One-time token sent in the password reset email. Cleared after use.
         /// </summary>
         public string? PasswordResetToken { get; set; }

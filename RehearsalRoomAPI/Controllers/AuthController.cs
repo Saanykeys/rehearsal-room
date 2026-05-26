@@ -252,6 +252,121 @@ namespace RehearsalRoomAPI.Controllers
             return Ok(new { message = "If that email exists and is unverified, a new link has been sent." });
         }
 
+        [HttpPost("google-login")]
+        public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Credential))
+                return BadRequest("Google credential is required.");
+
+            // ── Validate the Google ID token ──────────────────────────────────
+            GoogleTokenInfo? tokenInfo = null;
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                var response = await client.GetAsync(
+                    $"https://oauth2.googleapis.com/tokeninfo?id_token={dto.Credential}");
+
+                if (!response.IsSuccessStatusCode)
+                    return Unauthorized("Invalid Google token.");
+
+                var json = await response.Content.ReadAsStringAsync();
+                tokenInfo = System.Text.Json.JsonSerializer.Deserialize<GoogleTokenInfo>(json,
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            catch
+            {
+                return Unauthorized("Could not validate Google token.");
+            }
+
+            if (tokenInfo == null || string.IsNullOrWhiteSpace(tokenInfo.Sub))
+                return Unauthorized("Invalid Google token.");
+
+            var googleEmail = tokenInfo.Email?.Trim().ToLower() ?? "";
+            var googleName = tokenInfo.Name ?? googleEmail;
+            var googleId = tokenInfo.Sub;
+
+            // ── Check if user already exists ──────────────────────────────────
+            var existingUser = await _context.Users.FirstOrDefaultAsync(u =>
+                u.GoogleId == googleId || u.Email == googleEmail);
+
+            if (existingUser != null)
+            {
+                // Link Google ID if not already linked
+                if (string.IsNullOrWhiteSpace(existingUser.GoogleId))
+                {
+                    existingUser.GoogleId = googleId;
+                    await _context.SaveChangesAsync();
+                }
+
+                if (!existingUser.IsEmailVerified)
+                {
+                    existingUser.IsEmailVerified = true;
+                    await _context.SaveChangesAsync();
+                }
+
+                var org = existingUser.OrganizationId > 0
+                    ? await _context.Organizations.FindAsync(existingUser.OrganizationId)
+                    : null;
+
+                return Ok(CreateAuthResponse(existingUser, org, "Login successful"));
+            }
+
+            // ── New user — needs an invite code to join a team ────────────────
+            if (string.IsNullOrWhiteSpace(dto.InviteCode))
+            {
+                return Ok(new
+                {
+                    requiresInviteCode = true,
+                    googleId,
+                    email = googleEmail,
+                    fullName = googleName
+                });
+            }
+
+            // Find the org by invite code
+            var foundOrg = await _context.Organizations
+                .FirstOrDefaultAsync(o => o.InviteCode == dto.InviteCode.Trim().ToUpper());
+
+            if (foundOrg == null)
+                return BadRequest("Invalid invite code. Double-check with your Music Director.");
+
+            // Create the new user — already verified via Google
+            var newUser = new User
+            {
+                FullName = googleName,
+                Email = googleEmail,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()), // random unusable password
+                Role = "Team Member",
+                OrganizationId = foundOrg.Id,
+                GoogleId = googleId,
+                IsEmailVerified = true
+            };
+
+            _context.Users.Add(newUser);
+            await _context.SaveChangesAsync();
+
+            // Auto-seed attendance
+            var upcomingRehearsals = await _context.RehearsalEvents
+                .Where(e => e.OrganizationId == foundOrg.Id && e.EventDate >= DateTime.UtcNow.Date)
+                .ToListAsync();
+
+            if (upcomingRehearsals.Count > 0)
+            {
+                _context.AttendanceRecords.AddRange(upcomingRehearsals.Select(r => new AttendanceRecord
+                {
+                    OrganizationId = foundOrg.Id,
+                    RehearsalEventId = r.Id,
+                    MemberName = newUser.FullName,
+                    Role = newUser.Role,
+                    Status = "Pending",
+                    RespondedAt = DateTime.UtcNow
+                }));
+                await _context.SaveChangesAsync();
+            }
+
+            return Ok(CreateAuthResponse(newUser, foundOrg, "Account created successfully"));
+        }
+
         [HttpPost("forgot-password")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
         {

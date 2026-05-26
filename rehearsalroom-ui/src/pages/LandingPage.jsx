@@ -76,7 +76,7 @@ export default function LandingPage({ onGetStarted, onLogin, onGoToDashboard, is
       <section className="relative overflow-hidden px-4 pt-14 pb-10 text-center sm:px-6 sm:pt-20 md:pt-24 md:pb-16">
 
         {/* Worship stage SVG background */}
-        <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="pointer-events-none absolute inset-0">
           <svg viewBox="0 0 1440 700" xmlns="http://www.w3.org/2000/svg" className="h-full w-full object-cover" preserveAspectRatio="xMidYMid slice">
             {/* Sky gradient */}
             <defs>
@@ -269,7 +269,7 @@ export default function LandingPage({ onGetStarted, onLogin, onGoToDashboard, is
           </svg>
         </div>
 
-        <div className="relative mx-auto max-w-5xl">
+        <div className="relative z-10 mx-auto max-w-5xl">
         <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0}>
           <span className="inline-block rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.25em] text-amber-300 sm:tracking-[0.3em]">
             Built for worship teams

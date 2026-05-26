@@ -4,6 +4,7 @@ import AdminDashboard from "./components/AdminDashboard";
 import LandingPage from "./pages/LandingPage";
 import WaitlistPage from "./pages/WaitlistPage";
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5281";
 
@@ -169,6 +170,7 @@ export default function App() {
         onGoToDashboard={() => setShowDashboard(true)}
       />
       <Analytics />
+      <SpeedInsights />
     </>
   );
 }

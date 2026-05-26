@@ -610,6 +610,7 @@ export default function LandingPage({ onGetStarted, onLogin, onGoToDashboard, is
           </p>
           <div className="flex items-center gap-4 text-sm text-slate-500">
             <a href="/privacy" className="transition hover:text-amber-400">Privacy Policy</a>
+            <a href="/terms" className="transition hover:text-amber-400">Terms of Service</a>
             <a href="/waitlist" className="transition hover:text-amber-400">Join Waitlist</a>
           </div>
         </div>

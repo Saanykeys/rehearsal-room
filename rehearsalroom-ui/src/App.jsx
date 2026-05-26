@@ -4,6 +4,7 @@ import AdminDashboard from "./components/AdminDashboard";
 import LandingPage from "./pages/LandingPage";
 import WaitlistPage from "./pages/WaitlistPage";
 import PrivacyPage from "./pages/PrivacyPage";
+import TermsPage from "./pages/TermsPage";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 
@@ -138,6 +139,11 @@ export default function App() {
   // Show privacy policy at /privacy
   if (window.location.pathname === "/privacy") {
     return <PrivacyPage />;
+  }
+
+  // Show terms of service at /terms
+  if (window.location.pathname === "/terms") {
+    return <TermsPage />;
   }
 
   // Always show the dashboard if the user explicitly navigated there

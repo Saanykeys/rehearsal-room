@@ -1,7 +1,7 @@
 import logo from "../assets/rehearsalroom-logo.png";
 
 const EFFECTIVE_DATE = "May 26, 2026";
-const CONTACT_EMAIL = "saanykeys@gmail.com";
+const CONTACT_EMAIL = "rahsaanhall.swe@gmail.com";
 
 export default function PrivacyPage() {
   return (

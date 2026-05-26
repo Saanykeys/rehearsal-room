@@ -347,6 +347,28 @@ export default function LandingPage({ onGetStarted, onLogin }) {
         </div>
       </section>
 
+      {/* ── Waitlist Banner ──────────────────────────────────────────────── */}
+      <section className="mx-auto max-w-4xl px-4 pb-8 sm:px-6">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={fadeUp}
+          className="rounded-2xl border border-white/10 bg-white/5 p-6 flex flex-col sm:flex-row items-center justify-between gap-4"
+        >
+          <div>
+            <p className="text-xs font-black uppercase tracking-widest text-amber-400 mb-1">Want early access?</p>
+            <p className="font-bold text-white">Join the waitlist and be first to know when we launch new features.</p>
+          </div>
+          <a
+            href="/waitlist"
+            className="shrink-0 inline-flex items-center gap-2 rounded-2xl bg-amber-400 px-6 py-3 font-black text-slate-950 hover:bg-amber-300 transition-colors"
+          >
+            Join Waitlist <ArrowRight size={16} />
+          </a>
+        </motion.div>
+      </section>
+
       {/* ── CTA ──────────────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-4xl px-4 py-16 text-center sm:px-6 sm:py-24">
         <motion.div

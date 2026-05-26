@@ -99,6 +99,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
 
   // ── Announcements ────────────────────────────────────────────────────────
   const [announcements, setAnnouncements] = useState([]);
+  const [waitlistEntries, setWaitlistEntries] = useState([]);
   const [announcementForm, setAnnouncementFormState] = useState({ title: "", body: "" });
   const [announcementLoading, setAnnouncementLoading] = useState(false);
   const [announcementMsg, setAnnouncementMsg] = useState("");
@@ -246,6 +247,13 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
     }
   };
 
+  const loadWaitlist = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/Waitlist`, { headers: authHeaders });
+      if (res.ok) setWaitlistEntries(await res.json());
+    } catch { /* silent */ }
+  };
+
   useEffect(() => {
     loadSongs();
     loadSongSuggestions();
@@ -253,6 +261,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
     loadMembers();
     loadAttendanceRecords();
     loadAnnouncements();
+    if (isAdmin) loadWaitlist();
   }, []);
 
   // ── Songs CRUD ────────────────────────────────────────────────────────────
@@ -770,6 +779,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
     { name: "Rehearsals", icon: CalendarDays, roles: ["Music Director", "Team Member"] },
     { name: "Attendance", icon: ClipboardCheck, roles: ["Music Director", "Team Member"] },
     { name: "Members", icon: Users, roles: ["Music Director"] },
+    { name: "Waitlist", icon: ClipboardCheck, roles: ["Music Director"] },
     { name: "Settings", icon: Settings, roles: ["Music Director", "Team Member"] },
   ];
 
@@ -2262,6 +2272,55 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
               </div>
             );
           })()}
+
+          {/* ── Waitlist Tab ─────────────────────────────────────────────── */}
+          {activeTab === "Waitlist" && (
+            <div className="mt-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-black">Waitlist Signups</h2>
+                  <p className="text-sm text-slate-400 mt-1">{waitlistEntries.length} people waiting</p>
+                </div>
+                <button
+                  onClick={loadWaitlist}
+                  className="rounded-2xl bg-white/10 px-4 py-2 text-sm font-bold hover:bg-white/15 transition-all"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              {waitlistEntries.length === 0 ? (
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-12 text-center">
+                  <p className="text-slate-400 font-medium">No signups yet. Share your waitlist link!</p>
+                  <p className="text-amber-400 font-bold mt-2 text-sm">www.rehearsalroom.org/waitlist</p>
+                </div>
+              ) : (
+                <div className="rounded-3xl border border-white/10 bg-white/5 overflow-hidden">
+                  <div className="grid grid-cols-4 gap-4 px-6 py-3 border-b border-white/10 text-xs font-black uppercase tracking-widest text-slate-500">
+                    <span>Name</span>
+                    <span>Email</span>
+                    <span>Church</span>
+                    <span>Role</span>
+                  </div>
+                  {waitlistEntries.map((entry) => (
+                    <div key={entry.id} className="grid grid-cols-4 gap-4 px-6 py-4 border-b border-white/5 hover:bg-white/5 transition-all">
+                      <span className="font-bold text-white truncate">{entry.fullName}</span>
+                      <span className="text-slate-400 text-sm truncate">{entry.email}</span>
+                      <span className="text-slate-400 text-sm truncate">{entry.churchName}</span>
+                      <span className={`text-xs font-black px-2 py-1 rounded-lg w-fit ${
+                        entry.role === "Music Director" ? "bg-amber-400/20 text-amber-300" : "bg-blue-400/20 text-blue-300"
+                      }`}>{entry.role}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="rounded-3xl border border-amber-400/20 bg-amber-400/5 p-5">
+                <p className="text-sm font-bold text-amber-300">Share your waitlist</p>
+                <p className="text-sm text-slate-400 mt-1">Send people to <span className="text-white font-bold">www.rehearsalroom.org/waitlist</span> to sign up.</p>
+              </div>
+            </div>
+          )}
 
           {/* ── Settings Tab ────────────────────────────────────────────── */}
           {activeTab === "Settings" && (

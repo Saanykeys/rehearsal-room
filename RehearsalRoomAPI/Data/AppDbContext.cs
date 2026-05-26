@@ -39,6 +39,8 @@ namespace RehearsalRoomAPI.Data
 
         public DbSet<WaitlistEntry> WaitlistEntries { get; set; }
 
+        public DbSet<RehearsalMessage> RehearsalMessages { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // Unique invite code per organization

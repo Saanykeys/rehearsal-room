@@ -124,6 +124,22 @@ using (var scope = app.Services.CreateScope())
         // Safety net for schema changes added after the initial deploy.
         // EnsureCreated() only runs when the DB is brand-new; these handle incremental additions.
         db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""RehearsalMessages"" (
+                ""Id""               SERIAL PRIMARY KEY,
+                ""OrganizationId""   INTEGER NOT NULL DEFAULT 0,
+                ""RehearsalEventId"" INTEGER NOT NULL DEFAULT 0,
+                ""AuthorId""         INTEGER NOT NULL DEFAULT 0,
+                ""AuthorName""       TEXT NOT NULL DEFAULT '',
+                ""Body""             TEXT NOT NULL DEFAULT '',
+                ""CreatedAt""        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        ");
+        db.Database.ExecuteSqlRaw(@"
+            CREATE INDEX IF NOT EXISTS ""IX_RehearsalMessages_RehearsalEventId""
+            ON ""RehearsalMessages"" (""RehearsalEventId"")
+        ");
+
+        db.Database.ExecuteSqlRaw(@"
             CREATE TABLE IF NOT EXISTS ""Organizations"" (
                 ""Id""         SERIAL PRIMARY KEY,
                 ""Name""       TEXT NOT NULL DEFAULT '',
@@ -170,6 +186,21 @@ using (var scope = app.Services.CreateScope())
         db.Database.Migrate();
 
         // Safety net: create tables that may not exist from migrations
+        db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS RehearsalMessages (
+                Id               INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                OrganizationId   INTEGER NOT NULL DEFAULT 0,
+                RehearsalEventId INTEGER NOT NULL DEFAULT 0,
+                AuthorId         INTEGER NOT NULL DEFAULT 0,
+                AuthorName       TEXT    NOT NULL DEFAULT '',
+                Body             TEXT    NOT NULL DEFAULT '',
+                CreatedAt        TEXT    NOT NULL DEFAULT ''
+            )
+        ");
+        db.Database.ExecuteSqlRaw(@"
+            CREATE INDEX IF NOT EXISTS IX_RehearsalMessages_RehearsalEventId ON RehearsalMessages (RehearsalEventId)
+        ");
+
         db.Database.ExecuteSqlRaw(@"
             CREATE TABLE IF NOT EXISTS Organizations (
                 Id          INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,

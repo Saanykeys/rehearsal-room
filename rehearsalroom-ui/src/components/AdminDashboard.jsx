@@ -25,6 +25,10 @@ import {
   ListMusic,
   LogOut,
   User,
+  MessageSquare,
+  Send,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5281";
@@ -1893,6 +1897,13 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                             </button>
                           </div>
                         )}
+
+                        {/* Discussion thread */}
+                        <RehearsalDiscussion
+                          rehearsalId={rehearsal.id}
+                          token={token}
+                          currentUser={currentUser}
+                        />
                       </div>
                     );
                   })
@@ -2632,6 +2643,204 @@ function urlBase64ToUint8Array(base64String) {
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = atob(base64);
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+// ── RehearsalDiscussion ───────────────────────────────────────────────────────
+
+function RehearsalDiscussion({ rehearsalId, token, currentUser }) {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [text, setText] = useState("");
+  const [posting, setPosting] = useState(false);
+  const bottomRef = useRef(null);
+  const pollRef = useRef(null);
+
+  const authHeaders = { Authorization: `Bearer ${token}` };
+
+  const loadMessages = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/RehearsalMessages/${rehearsalId}`, {
+        headers: authHeaders,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data);
+      }
+    } catch {
+      // silent
+    }
+  };
+
+  // Load messages when panel opens, poll every 15s while open
+  useEffect(() => {
+    if (!open) {
+      clearInterval(pollRef.current);
+      return;
+    }
+    setLoading(true);
+    loadMessages().finally(() => setLoading(false));
+    pollRef.current = setInterval(loadMessages, 15000);
+    return () => clearInterval(pollRef.current);
+  }, [open, rehearsalId]);
+
+  // Scroll to bottom whenever messages change
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    }
+  }, [messages, open]);
+
+  const handlePost = async (e) => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    setPosting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/RehearsalMessages/${rehearsalId}`, {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ body: text.trim() }),
+      });
+      if (res.ok) {
+        const newMsg = await res.json();
+        setMessages((prev) => [...prev, newMsg]);
+        setText("");
+      }
+    } catch {
+      // silent
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/RehearsalMessages/${id}`, {
+        method: "DELETE",
+        headers: authHeaders,
+      });
+      if (res.ok || res.status === 204) {
+        setMessages((prev) => prev.filter((m) => m.id !== id));
+      }
+    } catch {
+      // silent
+    }
+  };
+
+  const formatMsgTime = (iso) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return d.toLocaleString([], {
+      month: "short", day: "numeric",
+      hour: "numeric", minute: "2-digit",
+    });
+  };
+
+  const isDirector = currentUser?.role === "Music Director";
+
+  return (
+    <div className="mt-5 border-t border-white/10 pt-5">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between rounded-2xl bg-slate-800/60 px-4 py-3 text-sm font-bold text-slate-300 hover:bg-slate-800 transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          <MessageSquare size={16} className="text-amber-400" />
+          Team Discussion
+          {messages.length > 0 && !open && (
+            <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs font-black text-amber-300">
+              {messages.length}
+            </span>
+          )}
+        </span>
+        {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </button>
+
+      {open && (
+        <div className="mt-3 rounded-2xl border border-white/10 bg-slate-950 overflow-hidden">
+          {/* Message feed */}
+          <div className="max-h-72 overflow-y-auto p-4 space-y-3">
+            {loading && messages.length === 0 && (
+              <p className="text-center text-xs text-slate-500 py-4">Loading discussion…</p>
+            )}
+            {!loading && messages.length === 0 && (
+              <div className="text-center py-6">
+                <MessageSquare size={28} className="mx-auto text-slate-700 mb-2" />
+                <p className="text-sm text-slate-500">No messages yet.</p>
+                <p className="text-xs text-slate-600 mt-1">Be the first to say something!</p>
+              </div>
+            )}
+            {messages.map((msg) => {
+              const isOwn = msg.isOwn || msg.authorId === currentUser?.id;
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex gap-3 group ${isOwn ? "flex-row-reverse" : ""}`}
+                >
+                  {/* Avatar */}
+                  <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center text-xs font-black ${
+                    isOwn ? "bg-amber-400 text-slate-950" : "bg-slate-700 text-slate-300"
+                  }`}>
+                    {(msg.authorName || "?")[0].toUpperCase()}
+                  </div>
+
+                  {/* Bubble */}
+                  <div className={`max-w-[75%] ${isOwn ? "items-end" : "items-start"} flex flex-col`}>
+                    <div className={`flex items-center gap-2 mb-1 ${isOwn ? "flex-row-reverse" : ""}`}>
+                      <span className="text-xs font-bold text-slate-400">
+                        {isOwn ? "You" : msg.authorName}
+                      </span>
+                      <span className="text-[10px] text-slate-600">{formatMsgTime(msg.createdAt)}</span>
+                    </div>
+                    <div className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                      isOwn
+                        ? "bg-amber-400 text-slate-950 font-medium rounded-tr-sm"
+                        : "bg-slate-800 text-slate-200 rounded-tl-sm"
+                    }`}>
+                      {msg.body}
+                    </div>
+                    {/* Delete button (own messages, or director) */}
+                    {(isOwn || isDirector) && (
+                      <button
+                        onClick={() => handleDelete(msg.id)}
+                        className="mt-1 text-[10px] text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Input */}
+          <form
+            onSubmit={handlePost}
+            className="flex items-center gap-2 border-t border-white/10 p-3"
+          >
+            <input
+              type="text"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Say something to the team…"
+              maxLength={500}
+              className="flex-1 rounded-xl bg-slate-800 border border-white/10 px-4 py-2.5 text-sm text-white outline-none placeholder:text-slate-500 focus:border-amber-400"
+            />
+            <button
+              type="submit"
+              disabled={posting || !text.trim()}
+              className="flex-shrink-0 flex items-center gap-1.5 rounded-xl bg-amber-400 px-4 py-2.5 text-sm font-black text-slate-950 transition hover:scale-[1.03] disabled:opacity-50"
+            >
+              <Send size={14} />
+              {posting ? "…" : "Send"}
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── WaitlistPanel ─────────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import rehearsalLogo from "./assets/rehearsalroom-logo.png";
 import AdminDashboard from "./components/AdminDashboard";
 import LandingPage from "./pages/LandingPage";
 import WaitlistPage from "./pages/WaitlistPage";
+import PrivacyPage from "./pages/PrivacyPage";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 
@@ -132,6 +133,11 @@ export default function App() {
   // Show waitlist page at /waitlist
   if (window.location.pathname === "/waitlist") {
     return <WaitlistPage />;
+  }
+
+  // Show privacy policy at /privacy
+  if (window.location.pathname === "/privacy") {
+    return <PrivacyPage />;
   }
 
   // Always show the dashboard if the user explicitly navigated there

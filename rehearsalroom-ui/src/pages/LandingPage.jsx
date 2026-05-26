@@ -600,7 +600,7 @@ export default function LandingPage({ onGetStarted, onLogin, onGoToDashboard, is
 
       {/* ── Footer ───────────────────────────────────────────────────────── */}
       <footer className="border-t border-white/5 py-8 sm:py-10">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 sm:flex-row sm:gap-4">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 sm:flex-row">
           <div className="flex items-center gap-3">
             <img src={logo} alt="Rehearsal Room" className="h-8 w-8 rounded-xl object-cover" />
             <span className="text-sm font-black uppercase tracking-[0.3em] text-amber-300">Rehearsal Room</span>
@@ -608,6 +608,10 @@ export default function LandingPage({ onGetStarted, onLogin, onGoToDashboard, is
           <p className="text-sm text-slate-600">
             © {new Date().getFullYear()} Rehearsal Room. Built for worship teams.
           </p>
+          <div className="flex items-center gap-4 text-sm text-slate-500">
+            <a href="/privacy" className="transition hover:text-amber-400">Privacy Policy</a>
+            <a href="/waitlist" className="transition hover:text-amber-400">Join Waitlist</a>
+          </div>
         </div>
       </footer>
 

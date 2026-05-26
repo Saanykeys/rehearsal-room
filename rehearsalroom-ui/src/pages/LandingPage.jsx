@@ -45,18 +45,12 @@ export default function LandingPage({ onGetStarted, onLogin }) {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={onLogin}
-              className="rounded-xl px-3 py-2 text-sm font-bold text-slate-300 transition hover:text-white sm:px-4"
-            >
-              Login
-            </button>
-            <button
-              onClick={onGetStarted}
+            <a
+              href="/waitlist"
               className="rounded-xl bg-amber-400 px-3 py-2 text-sm font-bold text-slate-950 transition hover:bg-amber-300 sm:px-4"
             >
-              Get Started
-            </button>
+              Join Waitlist
+            </a>
           </div>
         </div>
       </nav>
@@ -100,19 +94,13 @@ export default function LandingPage({ onGetStarted, onLogin }) {
           custom={0.3}
           className="mt-7 flex flex-col items-center gap-3 sm:flex-row sm:justify-center"
         >
-          <button
-            onClick={onGetStarted}
+          <a
+            href="/waitlist"
             className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 px-7 py-3.5 font-black text-slate-950 shadow-xl shadow-amber-400/20 transition hover:bg-amber-300 sm:w-auto"
           >
-            Start for Free
+            Join the Waitlist
             <ArrowRight size={18} />
-          </button>
-          <button
-            onClick={onLogin}
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-7 py-3.5 font-bold text-slate-200 transition hover:bg-white/10 sm:w-auto"
-          >
-            Login to my account
-          </button>
+          </a>
         </motion.div>
 
         <motion.div
@@ -122,7 +110,7 @@ export default function LandingPage({ onGetStarted, onLogin }) {
           custom={0.4}
           className="mt-5 flex flex-wrap items-center justify-center gap-4 text-sm text-slate-500"
         >
-          {["Free to get started", "No credit card required", "All roles included"].map((t) => (
+          {["Free to join", "Be the first to know", "Built for worship teams"].map((t) => (
             <span key={t} className="flex items-center gap-1.5">
               <CheckCircle size={14} className="text-amber-400" />
               {t}
@@ -386,13 +374,13 @@ export default function LandingPage({ onGetStarted, onLogin }) {
             Join worship leaders already using Rehearsal Room to run smoother,
             more prepared rehearsals every week.
           </p>
-          <button
-            onClick={onGetStarted}
+          <a
+            href="/waitlist"
             className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 px-8 py-4 text-base font-black text-slate-950 shadow-xl shadow-amber-400/20 transition hover:bg-amber-300 sm:mt-8 sm:w-auto sm:text-lg"
           >
-            Get Started Free
+            Join the Waitlist
             <ArrowRight size={20} />
-          </button>
+          </a>
         </motion.div>
       </section>
 

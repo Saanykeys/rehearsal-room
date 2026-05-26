@@ -34,5 +34,7 @@ namespace RehearsalRoomAPI.Data
         public DbSet<Announcement> Announcements { get; set; }
 
         public DbSet<PushSubscription> PushSubscriptions { get; set; }
+
+        public DbSet<WaitlistEntry> WaitlistEntries { get; set; }
     }
 }

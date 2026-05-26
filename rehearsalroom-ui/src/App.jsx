@@ -2,6 +2,7 @@ import { useState } from "react";
 import rehearsalLogo from "./assets/rehearsalroom-logo.png";
 import AdminDashboard from "./components/AdminDashboard";
 import LandingPage from "./pages/LandingPage";
+import WaitlistPage from "./pages/WaitlistPage";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5281";
 
@@ -102,6 +103,11 @@ export default function App() {
     setAuthMode("login");
     setShowAuth(false);
   };
+
+  // Show waitlist page at /waitlist
+  if (window.location.pathname === "/waitlist") {
+    return <WaitlistPage />;
+  }
 
   if (!isLoggedIn && !showAuth) {
     return (

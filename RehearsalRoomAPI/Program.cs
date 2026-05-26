@@ -139,6 +139,16 @@ using (var scope = app.Services.CreateScope())
                 CreatedAt TEXT    NOT NULL DEFAULT ''
             )
         ");
+        db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS WaitlistEntries (
+                Id          INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                Email       TEXT    NOT NULL DEFAULT '',
+                FullName    TEXT    NOT NULL DEFAULT '',
+                ChurchName  TEXT    NOT NULL DEFAULT '',
+                Role        TEXT    NOT NULL DEFAULT '',
+                CreatedAt   TEXT    NOT NULL DEFAULT ''
+            )
+        ");
     }
 }
 

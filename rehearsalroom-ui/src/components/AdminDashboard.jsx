@@ -819,14 +819,14 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
       <div className="flex min-h-screen flex-col lg:flex-row">
         {/* ── Sidebar ──────────────────────────────────────────────────── */}
         <aside
-          className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-white/10 bg-slate-950 transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-white/10 bg-slate-950 transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:w-52 lg:translate-x-0 ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
           {/* Top: logo + nav (scrollable if needed) */}
-          <div className="flex-1 overflow-y-auto p-5">
+          <div className="flex-1 overflow-y-auto p-5 lg:p-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-black uppercase tracking-[0.35em] text-amber-300">
+              <p className="text-sm font-black uppercase tracking-[0.35em] text-amber-300 lg:text-xs">
                 Rehearsal Room
               </p>
               <button onClick={() => setSidebarOpen(false)} className="lg:hidden">
@@ -834,7 +834,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
               </button>
             </div>
 
-            <nav className="mt-10 space-y-3">
+            <nav className="mt-10 space-y-2 lg:mt-6">
               {visibleNavItems.map((item) => {
                 const Icon = item.icon;
                 return (
@@ -844,13 +844,13 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                       setActiveTab(item.name);
                       setSidebarOpen(false);
                     }}
-                    className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-bold transition-all hover:scale-[1.02] ${
+                    className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-bold transition-all hover:scale-[1.02] lg:gap-2 lg:rounded-xl lg:px-3 lg:py-2 lg:text-sm ${
                       activeTab === item.name
                         ? "bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20"
                         : "bg-white/5 text-slate-200 hover:bg-white/10"
                     }`}
                   >
-                    <Icon size={20} />
+                    <Icon size={18} />
                     {item.name}
                   </button>
                 );
@@ -881,26 +881,27 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
           </div>
 
           {/* Bottom: logout — always visible, never pushed off screen */}
-          <div className="border-t border-white/10 p-5">
+          <div className="border-t border-white/10 p-5 lg:p-4">
             <button
               onClick={onLogout}
-              className="flex w-full items-center gap-3 rounded-2xl bg-red-500/10 px-4 py-3 font-bold text-red-300 transition-all hover:bg-red-500/20"
+              className="flex w-full items-center gap-3 rounded-2xl bg-red-500/10 px-4 py-3 font-bold text-red-300 transition-all hover:bg-red-500/20 lg:gap-2 lg:rounded-xl lg:px-3 lg:py-2 lg:text-sm"
             >
-              <LogOut size={20} />
+              <LogOut size={18} />
               Logout
             </button>
           </div>
         </aside>
 
         {/* ── Main content ─────────────────────────────────────────────── */}
-        <section className="flex-1 p-4 pt-20 pb-24 lg:p-8 lg:pb-8">
+        <section className="flex-1 p-4 pt-20 pb-24 lg:p-6 lg:pb-6">
+          <div className="mx-auto max-w-5xl">
           {/* Header */}
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-300">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">
                 {isAdmin ? "Music Director View" : "Team Member View"}
               </p>
-              <h1 className="mt-2 text-2xl font-black md:text-3xl">{activeTab}</h1>
+              <h1 className="mt-1 text-2xl font-black lg:text-2xl">{activeTab}</h1>
             </div>
 
             <div className="flex items-center gap-3">
@@ -1029,22 +1030,22 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
               )}
 
               {/* Welcome banner */}
-              <div className="rounded-3xl border border-amber-400/20 bg-gradient-to-br from-amber-950/60 via-slate-900 to-amber-900/30 p-5 shadow-2xl">
+              <div className="rounded-2xl border border-amber-400/20 bg-gradient-to-br from-amber-950/60 via-slate-900 to-amber-900/30 p-5 shadow-2xl lg:p-4">
                 <p className="text-xs font-bold uppercase tracking-[0.3em] text-amber-300">
                   Welcome Back
                 </p>
-                <h2 className="mt-3 text-3xl font-black">
+                <h2 className="mt-2 text-2xl font-black lg:text-xl">
                   {isAdmin
                     ? "Music Director Command Center 🎵"
                     : "Team Member Dashboard 🎶"}
                 </h2>
-                <p className="mt-3 max-w-2xl text-slate-300">
+                <p className="mt-2 max-w-2xl text-sm text-slate-300">
                   {isAdmin
                     ? "Manage rehearsals, song approvals, attendance, and team preparation from one place."
                     : "View rehearsals, setlists, songs, and attendance from here."}
                 </p>
                 {isAdmin && (
-                  <div className="mt-6 flex flex-wrap gap-3">
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <QuickButton
                       icon={Plus}
                       label="Add Song"
@@ -1079,7 +1080,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
               </div>
 
               {/* Stat cards */}
-              <div className="grid grid-cols-2 gap-5 md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:gap-4">
                 <StatCard title="Songs in Library" value={songs.length} />
                 <StatCard title="Rehearsals" value={rehearsals.length} />
                 <StatCard title="Song Suggestions" value={songSuggestions.length} />
@@ -2600,6 +2601,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
               </div>
             </div>
           )}
+          </div>{/* end max-w-5xl */}
         </section>
       </div>
 
@@ -2697,9 +2699,9 @@ function formatTime(value) {
 
 function StatCard({ title, value }) {
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl">
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-xl lg:p-4">
       <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{title}</p>
-      <p className="mt-3 text-4xl font-black text-white">{value ?? 0}</p>
+      <p className="mt-2 text-3xl font-black text-white lg:text-2xl">{value ?? 0}</p>
     </div>
   );
 }

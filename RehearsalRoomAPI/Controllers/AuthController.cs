@@ -473,7 +473,7 @@ namespace RehearsalRoomAPI.Controllers
 
                 var payload = new
                 {
-                    from = "Rehearsal Room <noreply@rehearsalroom.org>",
+                    from = "Rehearsal Room <noreply@rehearsalroom.app>",
                     to = new[] { dto.Email.Trim() },
                     subject = $"You're invited to join {dto.OrgName} on Rehearsal Room",
                     html

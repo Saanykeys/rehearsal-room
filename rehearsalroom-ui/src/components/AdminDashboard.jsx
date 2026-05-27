@@ -3246,7 +3246,7 @@ function InviteMemberForm({ inviteCode, orgName, token, onClose }) {
         </label>
         <label>
           <span className="text-sm font-bold text-slate-300">Their Email</span>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jane@church.com" className={inp} />
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jane@email.com" className={inp} />
         </label>
       </div>
 

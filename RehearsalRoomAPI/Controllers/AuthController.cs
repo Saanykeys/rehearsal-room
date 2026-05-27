@@ -46,44 +46,15 @@ namespace RehearsalRoomAPI.Controllers
                 return BadRequest("Password must be at least 8 characters.");
 
             // ── Determine role and organization ───────────────────────────────
-            var superAdminCode = _configuration["App:DirectorCode"] ?? "";
-            var submittedCode = request.DirectorCode?.Trim() ?? "";
-
-            // Check hardcoded super-admin code first, then one-time waitlist codes
-            bool isDirector = false;
-            WaitlistEntry? approvedWaitlistEntry = null;
-
-            if (!string.IsNullOrWhiteSpace(submittedCode))
-            {
-                if (submittedCode == superAdminCode)
-                {
-                    isDirector = true;
-                }
-                else
-                {
-                    // Check the waitlist table for a valid one-time code
-                    approvedWaitlistEntry = await _context.WaitlistEntries
-                        .FirstOrDefaultAsync(w =>
-                            w.DirectorInviteCode == submittedCode &&
-                            w.IsApproved &&
-                            !w.InviteCodeUsed &&
-                            w.InviteCodeExpiry != null &&
-                            w.InviteCodeExpiry > DateTime.UtcNow);
-
-                    if (approvedWaitlistEntry != null)
-                        isDirector = true;
-                }
-            }
-
-            if (!string.IsNullOrWhiteSpace(submittedCode) && !isDirector)
-                return BadRequest("Invalid or expired director code.");
-
+            // Open registration: if invite code provided → join team as Team Member
+            // Otherwise → create a new org and become Music Director
+            bool isDirector = string.IsNullOrWhiteSpace(request.InviteCode);
             Organization org;
 
             if (isDirector)
             {
                 if (string.IsNullOrWhiteSpace(request.OrgName))
-                    return BadRequest("Organization name is required when registering as a Music Director.");
+                    return BadRequest("Church or organization name is required.");
 
                 var inviteCode = GenerateInviteCode();
                 while (await _context.Organizations.AnyAsync(o => o.InviteCode == inviteCode))
@@ -101,9 +72,6 @@ namespace RehearsalRoomAPI.Controllers
             }
             else
             {
-                if (string.IsNullOrWhiteSpace(request.InviteCode))
-                    return BadRequest("An invite code is required. Ask your Music Director for the code.");
-
                 var foundOrg = await _context.Organizations
                     .FirstOrDefaultAsync(o => o.InviteCode == request.InviteCode.Trim().ToUpper());
 
@@ -129,13 +97,6 @@ namespace RehearsalRoomAPI.Controllers
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
-
-            // ── Mark one-time director code as used ───────────────────────────
-            if (approvedWaitlistEntry != null)
-            {
-                approvedWaitlistEntry.InviteCodeUsed = true;
-                await _context.SaveChangesAsync();
-            }
 
             // ── Auto-seed attendance ──────────────────────────────────────────
             var upcomingRehearsals = await _context.RehearsalEvents

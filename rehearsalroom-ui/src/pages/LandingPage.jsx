@@ -60,12 +60,12 @@ export default function LandingPage({ onGetStarted, onLogin, onGoToDashboard, is
                 >
                   Login
                 </button>
-                <a
-                  href="/waitlist"
+                <button
+                  onClick={onGetStarted}
                   className="rounded-xl bg-amber-400 px-3 py-2 text-sm font-bold text-slate-950 transition hover:bg-amber-300 sm:px-4"
                 >
-                  Join Waitlist
-                </a>
+                  Get Started
+                </button>
               </>
             )}
           </div>
@@ -307,13 +307,13 @@ export default function LandingPage({ onGetStarted, onLogin, onGoToDashboard, is
           custom={0.3}
           className="mt-7 flex flex-col items-center gap-3 sm:flex-row sm:justify-center"
         >
-          <a
-            href="/waitlist"
+          <button
+            onClick={onGetStarted}
             className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 px-7 py-3.5 font-black text-slate-950 shadow-xl shadow-amber-400/20 transition hover:bg-amber-300 sm:w-auto"
           >
-            Join the Waitlist
+            Get Started Free
             <ArrowRight size={18} />
-          </a>
+          </button>
         </motion.div>
 
         <motion.div
@@ -549,28 +549,6 @@ export default function LandingPage({ onGetStarted, onLogin, onGoToDashboard, is
         </div>
       </section>
 
-      {/* ── Waitlist Banner ──────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-4xl px-4 pb-8 sm:px-6">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={fadeUp}
-          className="rounded-2xl border border-white/10 bg-white/5 p-6 flex flex-col sm:flex-row items-center justify-between gap-4"
-        >
-          <div>
-            <p className="text-xs font-black uppercase tracking-widest text-amber-400 mb-1">Want early access?</p>
-            <p className="font-bold text-white">Join the waitlist and be first to know when we launch new features.</p>
-          </div>
-          <a
-            href="/waitlist"
-            className="shrink-0 inline-flex items-center gap-2 rounded-2xl bg-amber-400 px-6 py-3 font-black text-slate-950 hover:bg-amber-300 transition-colors"
-          >
-            Join Waitlist <ArrowRight size={16} />
-          </a>
-        </motion.div>
-      </section>
-
       {/* ── CTA ──────────────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-4xl px-4 py-16 text-center sm:px-6 sm:py-24">
         <motion.div
@@ -585,16 +563,15 @@ export default function LandingPage({ onGetStarted, onLogin, onGoToDashboard, is
             Your worship team deserves better tools.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-sm text-slate-400 sm:text-base">
-            Join worship leaders already using Rehearsal Room to run smoother,
-            more prepared rehearsals every week.
+            Free to start. Set up your team in minutes — no credit card required.
           </p>
-          <a
-            href="/waitlist"
+          <button
+            onClick={onGetStarted}
             className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 px-8 py-4 text-base font-black text-slate-950 shadow-xl shadow-amber-400/20 transition hover:bg-amber-300 sm:mt-8 sm:w-auto sm:text-lg"
           >
-            Join the Waitlist
+            Get Started Free
             <ArrowRight size={20} />
-          </a>
+          </button>
         </motion.div>
       </section>
 
@@ -611,7 +588,7 @@ export default function LandingPage({ onGetStarted, onLogin, onGoToDashboard, is
           <div className="flex items-center gap-4 text-sm text-slate-500">
             <a href="/privacy" className="transition hover:text-amber-400">Privacy Policy</a>
             <a href="/terms" className="transition hover:text-amber-400">Terms of Service</a>
-            <a href="/waitlist" className="transition hover:text-amber-400">Join Waitlist</a>
+            <button onClick={onGetStarted} className="transition hover:text-amber-400">Sign Up</button>
           </div>
         </div>
       </footer>

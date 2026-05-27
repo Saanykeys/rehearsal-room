@@ -327,9 +327,11 @@ function AuthScreen({
   onForgotPassword,
   onGoogleLogin,
 }) {
-  const [showDirectorCode, setShowDirectorCode] = useState(false);
   const isLogin = authMode === "login";
-  const isDirector = showDirectorCode && authForm.directorCode.trim().length > 0;
+  // "create" = start a new team (becomes Music Director), "join" = join existing team
+  const [registerMode, setRegisterMode] = useState(
+    authForm.inviteCode ? "join" : "create"
+  );
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 px-5 text-white">
@@ -442,67 +444,67 @@ function AuthScreen({
 
             {!isLogin && (
               <>
-                {/* Director toggle */}
-                <div>
+                {/* Mode switcher */}
+                <div className="flex rounded-xl overflow-hidden border border-white/10">
                   <button
                     type="button"
                     onClick={() => {
-                      setShowDirectorCode((v) => !v);
-                      // Clear both codes when toggling
-                      setAuthForm((prev) => ({ ...prev, directorCode: "", orgName: "", inviteCode: "" }));
+                      setRegisterMode("create");
+                      setAuthForm((prev) => ({ ...prev, inviteCode: "" }));
                     }}
-                    className="text-sm font-bold text-slate-400 hover:text-amber-300 transition-colors"
+                    className={`flex-1 py-2 text-sm font-bold transition-colors ${
+                      registerMode === "create"
+                        ? "bg-amber-400 text-slate-950"
+                        : "bg-transparent text-slate-400 hover:text-white"
+                    }`}
                   >
-                    {showDirectorCode ? "▼" : "▶"} I'm a Music Director
+                    Start my team
                   </button>
-
-                  {showDirectorCode ? (
-                    <div className="mt-3 space-y-3">
-                      <AuthInput
-                        label="Director Code"
-                        value={authForm.directorCode}
-                        onChange={(value) =>
-                          setAuthForm((prev) => ({ ...prev, directorCode: value }))
-                        }
-                        placeholder="Enter your director code"
-                      />
-                      <AuthInput
-                        label="Church / Organization Name"
-                        value={authForm.orgName}
-                        onChange={(value) =>
-                          setAuthForm((prev) => ({ ...prev, orgName: value }))
-                        }
-                        placeholder="e.g. Grace Community Church"
-                      />
-                      <p className="text-xs text-slate-500">
-                        This creates a private workspace for your team. You'll receive an invite code to share with members.
-                      </p>
-                    </div>
-                  ) : (
-                    /* Team member — needs invite code */
-                    <div className="mt-3">
-                      <AuthInput
-                        label="Team Invite Code"
-                        value={authForm.inviteCode}
-                        onChange={(value) =>
-                          setAuthForm((prev) => ({ ...prev, inviteCode: value.toUpperCase() }))
-                        }
-                        placeholder="e.g. ABCD1234"
-                      />
-                      <p className="mt-2 text-xs text-slate-500">
-                        Get this code from your Music Director to join your team's workspace.
-                      </p>
-                      <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/5 px-4 py-3">
-                        <p className="text-xs font-bold text-amber-300">Director not set up yet?</p>
-                        <p className="text-xs text-slate-400 mt-1">
-                          Your Music Director needs to register first. Ask them to{" "}
-                          <a href="/waitlist" className="text-amber-400 hover:underline font-bold">join the waitlist</a>
-                          {" "}— once approved, they'll get a code to set up your team.
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRegisterMode("join");
+                      setAuthForm((prev) => ({ ...prev, orgName: "" }));
+                    }}
+                    className={`flex-1 py-2 text-sm font-bold transition-colors ${
+                      registerMode === "join"
+                        ? "bg-amber-400 text-slate-950"
+                        : "bg-transparent text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Join a team
+                  </button>
                 </div>
+
+                {registerMode === "create" ? (
+                  <div className="space-y-1">
+                    <AuthInput
+                      label="Church / Organization Name"
+                      value={authForm.orgName}
+                      onChange={(value) =>
+                        setAuthForm((prev) => ({ ...prev, orgName: value }))
+                      }
+                      placeholder="e.g. Grace Community Church"
+                    />
+                    <p className="text-xs text-slate-500 pt-1">
+                      You'll become the Music Director and get an invite code to share with your team.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <AuthInput
+                      label="Team Invite Code"
+                      value={authForm.inviteCode}
+                      onChange={(value) =>
+                        setAuthForm((prev) => ({ ...prev, inviteCode: value.toUpperCase() }))
+                      }
+                      placeholder="e.g. ABCD1234"
+                    />
+                    <p className="text-xs text-slate-500 pt-1">
+                      Get this 8-character code from your Music Director.
+                    </p>
+                  </div>
+                )}
               </>
             )}
 
@@ -514,8 +516,8 @@ function AuthScreen({
               {authLoading ? "Please wait..." : isLogin ? "Login" : "Register"}
             </button>
 
-            {/* Google Sign-In — for team members only */}
-            {(isLogin || !isDirector) && (
+            {/* Google Sign-In — for login and team members joining */}
+            {(isLogin || registerMode === "join") && (
               <>
                 <div className="flex items-center gap-3">
                   <div className="h-px flex-1 bg-white/10" />

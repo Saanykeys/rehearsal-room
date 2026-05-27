@@ -479,13 +479,20 @@ namespace RehearsalRoomAPI.Controllers
                     html
                 };
 
-                var response = await client.PostAsJsonAsync("https://api.resend.com/emails", payload);
+                // Use the same serialization pattern as other email helpers
+                var json = JsonSerializer.Serialize(payload);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var response = await client.PostAsync("https://api.resend.com/emails", content);
+
                 if (!response.IsSuccessStatusCode)
-                    return StatusCode(500, "Could not send invite email.");
+                {
+                    var err = await response.Content.ReadAsStringAsync();
+                    return StatusCode(500, $"Email provider error: {err}");
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                return StatusCode(500, "Could not send invite email.");
+                return StatusCode(500, $"Could not send invite email: {ex.Message}");
             }
 
             return Ok(new { message = "Invite sent!" });

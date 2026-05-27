@@ -1032,9 +1032,9 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
               {/* Invite Member form (dashboard shortcut) */}
               {showInviteMemberForm && (
                 <InviteMemberForm
-                  form={inviteMemberForm}
-                  setForm={setInviteMemberForm}
-                  onSave={handleInviteMember}
+                  inviteCode={currentUser?.inviteCode}
+                  orgName={currentUser?.orgName}
+                  token={token}
                   onClose={() => setShowInviteMemberForm(false)}
                 />
               )}
@@ -2216,9 +2216,9 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                 {/* Invite form */}
                 {showInviteMemberForm && (
                   <InviteMemberForm
-                    form={inviteMemberForm}
-                    setForm={setInviteMemberForm}
-                    onSave={handleInviteMember}
+                    inviteCode={currentUser?.inviteCode}
+                    orgName={currentUser?.orgName}
+                    token={token}
                     onClose={() => setShowInviteMemberForm(false)}
                   />
                 )}
@@ -3175,48 +3175,100 @@ function DashboardCard({ title, children }) {
   );
 }
 
-function InviteMemberForm({ form, setForm, onSave, onClose }) {
+function InviteMemberForm({ inviteCode, orgName, token, onClose }) {
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [status, setStatus] = useState("idle"); // idle | sending | sent | error
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const inviteLink = `${window.location.origin}/?invite=${inviteCode}`;
   const inp = "mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-amber-400";
+
+  const handleSend = async () => {
+    if (!email.trim()) return;
+    setStatus("sending");
+    setErrorMsg("");
+    try {
+      const res = await fetch(`${API_BASE}/api/Auth/send-invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email: email.trim(), name: name.trim(), inviteLink, orgName }),
+      });
+      if (res.ok) {
+        setStatus("sent");
+      } else {
+        const t = await res.text();
+        setErrorMsg(t || "Could not send invite.");
+        setStatus("error");
+      }
+    } catch {
+      setErrorMsg("Network error. Try again.");
+      setStatus("error");
+    }
+  };
+
+  if (status === "sent") {
+    return (
+      <div className="rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-xl text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-400/10">
+          <svg className="h-7 w-7 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <h3 className="text-xl font-black">Invite Sent!</h3>
+        <p className="mt-2 text-sm text-slate-400">
+          We emailed <span className="font-bold text-white">{email}</span> with a link to join {orgName}.
+          They just click it and set up their account.
+        </p>
+        <button onClick={onClose} className="mt-5 rounded-2xl bg-white/10 px-6 py-3 font-bold text-slate-200 hover:bg-white/15">
+          Done
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-xl">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-black">Add Member</h3>
+        <h3 className="text-xl font-black">Invite Member</h3>
         <button onClick={onClose} className="rounded-xl bg-white/10 px-3 py-1 text-sm font-bold text-slate-300 hover:bg-white/20">
           Cancel
         </button>
       </div>
-      <p className="mt-2 text-sm text-slate-400">A login account will be created so they can sign in immediately.</p>
+      <p className="mt-2 text-sm text-slate-400">
+        We'll email them a personal invite link. They click it and create their own account — no password from you needed.
+      </p>
+
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         <label>
-          <span className="text-sm font-bold text-slate-300">Full Name</span>
-          <input value={form.fullName} onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))} placeholder="Jane Smith" className={inp} />
+          <span className="text-sm font-bold text-slate-300">Their Name <span className="text-slate-500 font-normal">(optional)</span></span>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Smith" className={inp} />
         </label>
         <label>
-          <span className="text-sm font-bold text-slate-300">Email</span>
-          <input type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} placeholder="jane@worship.com" className={inp} />
+          <span className="text-sm font-bold text-slate-300">Their Email</span>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jane@church.com" className={inp} />
         </label>
-        <label>
-          <span className="text-sm font-bold text-slate-300">Password</span>
-          <input type="password" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} placeholder="Min 8 characters" className={inp} />
-        </label>
-        <label>
-          <span className="text-sm font-bold text-slate-300">Role</span>
-          <select value={form.role} onChange={(e) => setForm((p) => ({ ...p, role: e.target.value, directorCode: "" }))}
-            className={inp}>
-            <option>Team Member</option>
-            <option>Music Director</option>
-          </select>
-        </label>
-        {form.role === "Music Director" && (
-          <label className="md:col-span-2">
-            <span className="text-sm font-bold text-slate-300">Director Code</span>
-            <input value={form.directorCode} onChange={(e) => setForm((p) => ({ ...p, directorCode: e.target.value }))} placeholder="Required to grant Music Director role" className={inp} />
-          </label>
-        )}
       </div>
-      <button onClick={onSave}
-        className="mt-5 rounded-2xl bg-amber-400 px-6 py-3 font-black text-slate-950 transition-all hover:scale-[1.02]">
-        Add Member
+
+      {/* Or copy link manually */}
+      <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950 p-3">
+        <p className="text-xs text-slate-500 mb-2">Or share the link yourself:</p>
+        <div className="flex items-center gap-2">
+          <p className="flex-1 truncate font-mono text-xs text-amber-300">{inviteLink}</p>
+          <CopyInviteLinkButton code={inviteCode} />
+        </div>
+      </div>
+
+      {status === "error" && (
+        <p className="mt-3 text-sm text-red-400">{errorMsg}</p>
+      )}
+
+      <button
+        onClick={handleSend}
+        disabled={status === "sending" || !email.trim()}
+        className="mt-5 rounded-2xl bg-amber-400 px-6 py-3 font-black text-slate-950 transition-all hover:scale-[1.02] disabled:opacity-50"
+      >
+        {status === "sending" ? "Sending…" : "Send Invite Email"}
       </button>
     </div>
   );

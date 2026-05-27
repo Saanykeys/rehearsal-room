@@ -440,6 +440,57 @@ namespace RehearsalRoomAPI.Controllers
             return Ok(new { message = "Name updated successfully.", fullName = user.FullName });
         }
 
+        [HttpPost("send-invite")]
+        [Authorize(Roles = "Music Director")]
+        public async Task<IActionResult> SendInvite([FromBody] SendInviteDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Email))
+                return BadRequest("Email is required.");
+
+            var directorName = User.FindFirst(ClaimTypes.Name)?.Value ?? "Your Music Director";
+            var greeting = string.IsNullOrWhiteSpace(dto.Name) ? "Hey there" : $"Hey {dto.Name.Trim()}";
+
+            try
+            {
+                var resendApiKey = _configuration["Resend:ApiKey"] ?? "";
+                if (string.IsNullOrWhiteSpace(resendApiKey))
+                    return Ok(new { message = "Invite link generated (email not configured)." });
+
+                var client = _httpClientFactory.CreateClient();
+                client.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", resendApiKey);
+
+                var html = $@"
+                    <div style='font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0f172a;color:#f1f5f9;border-radius:16px;'>
+                      <h1 style='color:#fbbf24;font-size:24px;margin:0 0 8px;'>You're invited! 🎵</h1>
+                      <p style='color:#94a3b8;margin:0 0 24px;'>{greeting}, {directorName} has invited you to join <strong style='color:#f1f5f9;'>{dto.OrgName}</strong> on Rehearsal Room.</p>
+                      <a href='{dto.InviteLink}' style='display:inline-block;background:#fbbf24;color:#0f172a;font-weight:900;padding:14px 28px;border-radius:12px;text-decoration:none;font-size:16px;'>
+                        Join {dto.OrgName} →
+                      </a>
+                      <p style='color:#475569;font-size:13px;margin-top:24px;'>Just click the button, create your account, and you're in. The invite code is already filled in for you.</p>
+                      <p style='color:#334155;font-size:12px;margin-top:16px;'>Rehearsal Room · Worship team management</p>
+                    </div>";
+
+                var payload = new
+                {
+                    from = "Rehearsal Room <noreply@rehearsalroom.org>",
+                    to = new[] { dto.Email.Trim() },
+                    subject = $"You're invited to join {dto.OrgName} on Rehearsal Room",
+                    html
+                };
+
+                var response = await client.PostAsJsonAsync("https://api.resend.com/emails", payload);
+                if (!response.IsSuccessStatusCode)
+                    return StatusCode(500, "Could not send invite email.");
+            }
+            catch
+            {
+                return StatusCode(500, "Could not send invite email.");
+            }
+
+            return Ok(new { message = "Invite sent!" });
+        }
+
         [HttpPut("update-org-name")]
         [Authorize(Roles = "Music Director")]
         public async Task<IActionResult> UpdateOrgName([FromBody] UpdateOrgNameDto dto)

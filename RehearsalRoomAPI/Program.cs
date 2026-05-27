@@ -98,6 +98,27 @@ var app = builder.Build();
 
 app.UseCors("AllowReactApp");
 
+// Manual CORS safety net — ensures preflight OPTIONS always gets headers
+// even if the built-in middleware misses an origin
+app.Use(async (context, next) =>
+{
+    var origin = context.Request.Headers["Origin"].ToString();
+    if (!string.IsNullOrEmpty(origin) && allowedOrigins.Contains(origin))
+    {
+        context.Response.Headers["Access-Control-Allow-Origin"] = origin;
+        context.Response.Headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
+        context.Response.Headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
+        context.Response.Headers["Vary"] = "Origin";
+    }
+    if (context.Request.Method == "OPTIONS")
+    {
+        context.Response.StatusCode = 204;
+        await context.Response.CompleteAsync();
+        return;
+    }
+    await next();
+});
+
 // Global error handler — never leaks raw stack traces to the client
 app.UseExceptionHandler(errApp => errApp.Run(async ctx =>
 {

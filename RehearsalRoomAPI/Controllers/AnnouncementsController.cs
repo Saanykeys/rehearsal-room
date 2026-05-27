@@ -87,7 +87,7 @@ namespace RehearsalRoomAPI.Controllers
         private async Task SendEmailsAsync(Announcement announcement, int orgId)
         {
             var apiKey = _config["Resend:ApiKey"];
-            var fromEmail = _config["Resend:FromEmail"] ?? "Rehearsal Room <noreply@rehearsalroom.app>";
+            var fromEmail = _config["Resend:FromEmail"] ?? "Rehearsal Room <noreply@rehearsalroom.org>";
 
             if (string.IsNullOrWhiteSpace(apiKey) || apiKey == "REPLACE_WITH_YOUR_RESEND_API_KEY")
                 return;
@@ -142,7 +142,7 @@ namespace RehearsalRoomAPI.Controllers
         {
             var vapidPublic = _config["Vapid:PublicKey"];
             var vapidPrivate = _config["Vapid:PrivateKey"];
-            var vapidSubject = _config["Vapid:Subject"] ?? "mailto:admin@rehearsalroom.app";
+            var vapidSubject = _config["Vapid:Subject"] ?? "mailto:admin@rehearsalroom.org";
 
             if (string.IsNullOrWhiteSpace(vapidPublic) || string.IsNullOrWhiteSpace(vapidPrivate))
                 return;
@@ -182,8 +182,4 @@ namespace RehearsalRoomAPI.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Push] Batch send failed: {ex.Message}");
-            }
-        }
-    }
-}
+                Console.WriteLine($"[Push] Batch send failed: {ex.Mess

@@ -473,7 +473,7 @@ namespace RehearsalRoomAPI.Controllers
 
                 var payload = new
                 {
-                    from = "Rehearsal Room <noreply@rehearsalroom.app>",
+                    from = "Rehearsal Room <noreply@rehearsalroom.org>",
                     to = new[] { dto.Email.Trim() },
                     subject = $"You're invited to join {dto.OrgName} on Rehearsal Room",
                     html
@@ -556,7 +556,7 @@ namespace RehearsalRoomAPI.Controllers
 
                 var payload = new
                 {
-                    from = "Rehearsal Room <noreply@rehearsalroom.app>",
+                    from = "Rehearsal Room <noreply@rehearsalroom.org>",
                     to = new[] { toEmail },
                     subject = "Verify your Rehearsal Room account",
                     html = $@"
@@ -593,7 +593,7 @@ namespace RehearsalRoomAPI.Controllers
 
                 var payload = new
                 {
-                    from = "Rehearsal Room <noreply@rehearsalroom.app>",
+                    from = "Rehearsal Room <noreply@rehearsalroom.org>",
                     to = new[] { toEmail },
                     subject = "Reset your Rehearsal Room password",
                     html = $@"

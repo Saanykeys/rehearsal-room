@@ -172,7 +172,7 @@ namespace RehearsalRoomAPI.Controllers
 
                 var payload = new
                 {
-                    from = _config["Resend:FromEmail"] ?? "Rehearsal Room <noreply@rehearsalroom.app>",
+                    from = _config["Resend:FromEmail"] ?? "Rehearsal Room <noreply@rehearsalroom.org>",
                     to = new[] { entry.Email },
                     subject = "You're approved — here's your Rehearsal Room director code",
                     html
@@ -211,7 +211,7 @@ namespace RehearsalRoomAPI.Controllers
 
                 var payload = new
                 {
-                    from = _config["Resend:FromEmail"] ?? "Rehearsal Room <noreply@rehearsalroom.app>",
+                    from = _config["Resend:FromEmail"] ?? "Rehearsal Room <noreply@rehearsalroom.org>",
                     to = new[] { recipient },
                     subject = "You're on the Rehearsal Room waitlist!",
                     html

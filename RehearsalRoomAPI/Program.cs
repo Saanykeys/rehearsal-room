@@ -73,6 +73,10 @@ var allowedOrigins = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     // Production — both www and apex in case the env var is missing/wrong
     "https://rehearsalroom.org",
     "https://www.rehearsalroom.org",
+    // Capacitor iOS native shell origin
+    "capacitor://localhost",
+    "ionic://localhost",
+    "http://localhost",
 };
 foreach (var url in frontendUrls) allowedOrigins.Add(url);
 

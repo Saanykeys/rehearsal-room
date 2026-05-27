@@ -13,8 +13,8 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5281";
 
 export default function App() {
-  const [showAuth, setShowAuth] = useState(false);
-  const [showDashboard, setShowDashboard] = useState(false);
+  // Read invite code from URL first — used to initialize state below
+  const urlInviteCode = new URLSearchParams(window.location.search).get("invite") || "";
 
   const [currentUser, setCurrentUser] = useState(() => {
     const savedUser = localStorage.getItem("rehearsalRoomUser");
@@ -38,12 +38,17 @@ export default function App() {
     return localStorage.getItem("rehearsalRoomToken");
   });
 
-  const [authMode, setAuthMode] = useState("login");
+  const isLoggedIn = currentUser && token;
+
+  // If someone clicked an invite link, jump straight to the register form
+  const [showAuth, setShowAuth] = useState(!!urlInviteCode && !isLoggedIn);
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [authMode, setAuthMode] = useState(urlInviteCode ? "register" : "login");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState(null);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [googlePendingUser, setGooglePendingUser] = useState(null); // { googleId, email, fullName }
+  const [googlePendingUser, setGooglePendingUser] = useState(null);
 
   const [authForm, setAuthForm] = useState({
     fullName: "",
@@ -51,9 +56,8 @@ export default function App() {
     password: "",
     directorCode: "",
     orgName: "",
-    inviteCode: "",
+    inviteCode: urlInviteCode.toUpperCase(),
   });
-  const isLoggedIn = currentUser && token;
 
   const handleAuthSubmit = async (event) => {
     event.preventDefault();

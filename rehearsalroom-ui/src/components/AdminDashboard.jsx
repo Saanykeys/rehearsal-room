@@ -2527,24 +2527,27 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                     </div>
                     <div className="rounded-2xl border border-amber-400/30 bg-slate-950 px-4 py-4">
                       <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Team Invite Code</p>
-                      <div className="mt-2 flex items-center gap-3">
-                        <p className="font-mono text-xl font-black tracking-[0.2em] text-amber-300">
-                          {currentUser?.inviteCode}
-                        </p>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(currentUser?.inviteCode || "");
-                            alert("Invite code copied to clipboard!");
-                          }}
-                          className="rounded-xl bg-amber-400/20 px-3 py-1.5 text-xs font-black text-amber-300 hover:bg-amber-400/30 transition-all"
-                        >
-                          Copy
-                        </button>
-                      </div>
+                      <p className="mt-2 font-mono text-xl font-black tracking-[0.2em] text-amber-300">
+                        {currentUser?.inviteCode}
+                      </p>
                     </div>
                   </div>
-                  <p className="mt-4 text-xs text-slate-500">
-                    Team members enter this code on the registration screen to join <strong className="text-slate-300">{currentUser?.orgName}</strong>. Keep it private — only share with people you trust.
+
+                  {/* Invite link */}
+                  <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">Invite Link</p>
+                    <p className="text-xs text-slate-500 mb-3">
+                      Share this link with your team — the invite code is already filled in for them. They just create a name, email, and password.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="flex-1 truncate rounded-xl bg-slate-800 px-3 py-2.5 font-mono text-xs text-amber-300">
+                        {`${window.location.origin}/?invite=${currentUser?.inviteCode}`}
+                      </p>
+                      <CopyInviteLinkButton code={currentUser?.inviteCode} />
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs text-slate-500">
+                    Only share with people you trust — anyone with this link can join <strong className="text-slate-300">{currentUser?.orgName}</strong>.
                   </p>
                 </div>
               )}
@@ -2649,6 +2652,33 @@ function urlBase64ToUint8Array(base64String) {
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = atob(base64);
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+// ── CopyInviteLinkButton ──────────────────────────────────────────────────────
+
+function CopyInviteLinkButton({ code }) {
+  const [copied, setCopied] = useState(false);
+  const link = `${window.location.origin}/?invite=${code}`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(link).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className={`flex-shrink-0 rounded-xl px-4 py-2.5 text-xs font-black transition-all ${
+        copied
+          ? "bg-emerald-400/20 text-emerald-300"
+          : "bg-amber-400/20 text-amber-300 hover:bg-amber-400/30"
+      }`}
+    >
+      {copied ? "✓ Copied!" : "Copy Link"}
+    </button>
+  );
 }
 
 // ── RehearsalDiscussion ───────────────────────────────────────────────────────

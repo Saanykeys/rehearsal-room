@@ -1,0 +1,10 @@
+{
+  "appId": "org.rehearsalroom.app",
+  "appName": "Rehearsal Room",
+  "webDir": "dist",
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    }
+  }
+}

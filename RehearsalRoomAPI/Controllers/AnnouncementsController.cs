@@ -182,4 +182,8 @@ namespace RehearsalRoomAPI.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Push] Batch send failed: {ex.Mess
+                Console.WriteLine($"[Push] Batch send failed: {ex.Message}");
+            }
+        }
+    }
+}

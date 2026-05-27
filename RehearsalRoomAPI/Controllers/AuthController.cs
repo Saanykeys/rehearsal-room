@@ -440,6 +440,26 @@ namespace RehearsalRoomAPI.Controllers
             return Ok(new { message = "Name updated successfully.", fullName = user.FullName });
         }
 
+        [HttpPut("update-org-name")]
+        [Authorize(Roles = "Music Director")]
+        public async Task<IActionResult> UpdateOrgName([FromBody] UpdateOrgNameDto dto)
+        {
+            var orgIdClaim = User.FindFirst("OrganizationId")?.Value;
+            if (orgIdClaim == null || !int.TryParse(orgIdClaim, out var orgId) || orgId == 0)
+                return Unauthorized("Invalid token.");
+
+            if (string.IsNullOrWhiteSpace(dto.OrgName))
+                return BadRequest("Organization name cannot be empty.");
+
+            var org = await _context.Organizations.FindAsync(orgId);
+            if (org == null) return NotFound("Organization not found.");
+
+            org.Name = dto.OrgName.Trim();
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Organization name updated.", orgName = org.Name });
+        }
+
         [HttpPut("change-password")]
         [Authorize]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)

@@ -2520,11 +2520,12 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                   <p className="mt-2 text-sm text-slate-400">
                     Share this invite code with your worship team members so they can register and join your workspace.
                   </p>
-                  <div className="mt-6 grid gap-4 md:grid-cols-2">
-                    <div className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-4">
-                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Organization</p>
-                      <p className="mt-2 font-black text-white">{currentUser?.orgName || "—"}</p>
-                    </div>
+                  <div className="mt-6 space-y-4">
+                    <OrgNameEditor currentUser={currentUser} token={token} onUpdated={(newName) => {
+                      const updated = { ...currentUser, orgName: newName };
+                      localStorage.setItem("rehearsalRoomUser", JSON.stringify(updated));
+                      window.location.reload();
+                    }} />
                     <div className="rounded-2xl border border-amber-400/30 bg-slate-950 px-4 py-4">
                       <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Team Invite Code</p>
                       <p className="mt-2 font-mono text-xl font-black tracking-[0.2em] text-amber-300">
@@ -2552,20 +2553,6 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                 </div>
               )}
 
-              {/* App info */}
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl">
-                <h3 className="text-2xl font-black">App Info</h3>
-                <div className="mt-6 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-4">
-                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">API Base</p>
-                    <p className="mt-2 font-mono text-sm text-amber-300">{API_BASE}</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-4">
-                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Version</p>
-                    <p className="mt-2 font-black text-white">Rehearsal Room v1.0</p>
-                  </div>
-                </div>
-              </div>
 
               {/* Danger zone */}
               <div className="rounded-3xl border border-red-500/30 bg-red-500/5 p-6 shadow-xl">
@@ -2652,6 +2639,83 @@ function urlBase64ToUint8Array(base64String) {
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = atob(base64);
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+// ── OrgNameEditor ─────────────────────────────────────────────────────────────
+
+function OrgNameEditor({ currentUser, token, onUpdated }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(currentUser?.orgName || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSave = async () => {
+    if (!value.trim()) return;
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/Auth/update-org-name`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ orgName: value.trim() }),
+      });
+      if (res.ok) {
+        setEditing(false);
+        onUpdated(value.trim());
+      } else {
+        const t = await res.text();
+        setError(t || "Could not save.");
+      }
+    } catch {
+      setError("Network error.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-4">
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Organization Name</p>
+      {editing ? (
+        <div className="mt-2 space-y-2">
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            maxLength={80}
+            className="w-full rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-white outline-none focus:border-amber-400"
+            autoFocus
+          />
+          {error && <p className="text-xs text-red-400">{error}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              disabled={saving || !value.trim()}
+              className="rounded-xl bg-amber-400 px-4 py-1.5 text-xs font-black text-slate-950 disabled:opacity-50"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button
+              onClick={() => { setEditing(false); setValue(currentUser?.orgName || ""); setError(""); }}
+              className="rounded-xl bg-white/10 px-4 py-1.5 text-xs font-bold text-slate-300 hover:bg-white/15"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <p className="font-black text-white">{currentUser?.orgName || "—"}</p>
+          <button
+            onClick={() => setEditing(true)}
+            className="flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-xs font-bold text-slate-300 hover:bg-white/15 transition-colors"
+          >
+            <Pencil size={12} /> Edit
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── CopyInviteLinkButton ──────────────────────────────────────────────────────

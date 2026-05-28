@@ -126,6 +126,10 @@ namespace RehearsalRoomAPI.Controllers
 
             await SendVerificationEmailAsync(user.Email, user.FullName, verifyLink);
 
+            // ── Notify admin when a new director signs up ─────────────────────
+            if (isDirector)
+                _ = Task.Run(() => SendAdminSignupNotificationAsync(user.FullName, user.Email, org.Name, org.Id));
+
             // Return without a token — user must verify first
             return Ok(new
             {
@@ -575,6 +579,54 @@ namespace RehearsalRoomAPI.Controllers
             catch
             {
                 // Email failure should not surface as an error
+            }
+        }
+
+        private async Task SendAdminSignupNotificationAsync(string directorName, string directorEmail, string orgName, int orgId = 0)
+        {
+            try
+            {
+                var resendApiKey = _configuration["Resend:ApiKey"] ?? "";
+                if (string.IsNullOrWhiteSpace(resendApiKey)) return;
+
+                var adminEmail = _configuration["App:AdminEmail"] ?? "rahsaanhall.swe@gmail.com";
+                var totalOrgs = await _context.Organizations.CountAsync();
+                var totalUsers = await _context.Users.CountAsync();
+                var orgMemberCount = orgId > 0 ? await _context.Users.CountAsync(u => u.OrganizationId == orgId) : 1;
+
+                var client = _httpClientFactory.CreateClient();
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", resendApiKey);
+
+                var payload = new
+                {
+                    from = "Rehearsal Room <noreply@rehearsalroom.org>",
+                    to = new[] { adminEmail },
+                    subject = $"New signup: {orgName}",
+                    html = $@"
+                        <div style=""font-family:sans-serif;max-width:480px;margin:0 auto;background:#0f172a;color:#f8fafc;padding:32px;border-radius:16px"">
+                          <p style=""font-size:11px;font-weight:900;letter-spacing:0.3em;text-transform:uppercase;color:#fbbf24;margin:0 0 16px"">Rehearsal Room · New Signup</p>
+                          <h1 style=""font-size:22px;font-weight:900;margin:0 0 20px"">A new church just signed up!</h1>
+                          <table style=""width:100%;font-size:14px;border-collapse:collapse;margin-bottom:24px"">
+                            <tr><td style=""color:#94a3b8;padding:6px 0"">Name</td><td style=""color:#f1f5f9;font-weight:600"">{directorName}</td></tr>
+                            <tr><td style=""color:#94a3b8;padding:6px 0"">Email</td><td style=""color:#fbbf24"">{directorEmail}</td></tr>
+                            <tr><td style=""color:#94a3b8;padding:6px 0"">Church</td><td style=""color:#f1f5f9;font-weight:600"">{orgName}</td></tr>
+                            <tr><td style=""color:#94a3b8;padding:6px 0"">Members</td><td style=""color:#f1f5f9"">{orgMemberCount}</td></tr>
+                          </table>
+                          <div style=""border-top:1px solid #1e293b;padding-top:20px"">
+                            <p style=""font-size:12px;color:#64748b;margin:0 0 8px"">Overall stats</p>
+                            <p style=""font-size:13px;color:#94a3b8;margin:0"">Total churches: <strong style=""color:#f1f5f9"">{totalOrgs}</strong> &nbsp;·&nbsp; Total users: <strong style=""color:#f1f5f9"">{totalUsers}</strong></p>
+                          </div>
+                        </div>"
+                };
+
+                var json = JsonSerializer.Serialize(payload);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                await client.PostAsync("https://api.resend.com/emails", content);
+            }
+            catch
+            {
+                // Never block registration if notification fails
             }
         }
 

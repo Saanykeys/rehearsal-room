@@ -75,8 +75,16 @@ export default function LandingPage({ onGetStarted, onLogin, onGoToDashboard, is
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden px-4 pt-14 pb-10 text-center sm:px-6 sm:pt-20 md:pt-24 md:pb-16">
 
-        {/* Worship stage SVG background */}
+        {/* Worship stage photo background */}
         <div className="pointer-events-none absolute inset-0">
+          <img
+            src="https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1920&q=80"
+            alt=""
+            className="h-full w-full object-cover object-center"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/60 to-slate-950/90" />
+        </div>
+        <div className="pointer-events-none absolute inset-0 hidden">
           <svg viewBox="0 0 1440 700" xmlns="http://www.w3.org/2000/svg" className="h-full w-full object-cover" preserveAspectRatio="xMidYMid slice">
             {/* Sky gradient */}
             <defs>
@@ -267,6 +275,7 @@ export default function LandingPage({ onGetStarted, onLogin, onGoToDashboard, is
             </linearGradient>
             <rect width="1440" height="700" fill="url(#topFade)" />
           </svg>
+        </div>
         </div>
 
         <div className="relative z-10 mx-auto max-w-5xl">

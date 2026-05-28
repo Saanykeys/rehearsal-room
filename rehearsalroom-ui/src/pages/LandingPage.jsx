@@ -276,7 +276,6 @@ export default function LandingPage({ onGetStarted, onLogin, onGoToDashboard, is
             <rect width="1440" height="700" fill="url(#topFade)" />
           </svg>
         </div>
-        </div>
 
         <div className="relative z-10 mx-auto max-w-5xl">
         <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0}>

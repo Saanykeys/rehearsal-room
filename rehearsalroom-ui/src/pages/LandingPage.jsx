@@ -78,7 +78,7 @@ export default function LandingPage({ onGetStarted, onLogin, onGoToDashboard, is
         {/* Worship stage photo background */}
         <div className="pointer-events-none absolute inset-0">
           <img
-            src="https://images.unsplash.com/photo-1529070538774-1843cb3265df?w=1920&q=80"
+            src="https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=1920&q=80"
             alt=""
             className="h-full w-full object-cover object-center"
           />

@@ -266,6 +266,17 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
     loadAttendanceRecords();
     loadAnnouncements();
     if (isAdmin) loadWaitlist();
+
+    // Poll every 30 seconds so team members see new announcements,
+    // rehearsals, and song library changes without refreshing the page
+    const poll = setInterval(() => {
+      loadAnnouncements();
+      loadRehearsals();
+      loadSongs();
+      loadSongSuggestions();
+    }, 30000);
+
+    return () => clearInterval(poll);
   }, []);
 
   // ── Songs CRUD ────────────────────────────────────────────────────────────
@@ -363,11 +374,19 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
     }
   };
 
-  const approveSuggestion = async (id) => {
-    await fetch(`${API_BASE}/api/SongSuggestions/${id}/approve`, {
+  const approveSuggestion = async (id, title) => {
+    const approveRes = await fetch(`${API_BASE}/api/SongSuggestions/${id}/approve`, {
       method: "PUT",
       headers: authHeaders,
     });
+    if (approveRes.ok) {
+      // Automatically add to song library in the same action
+      await fetch(`${API_BASE}/api/SongSuggestions/${id}/add-to-library`, {
+        method: "POST",
+        headers: authHeaders,
+      });
+      await loadSongs();
+    }
     loadSongSuggestions();
   };
 
@@ -377,15 +396,6 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
       headers: authHeaders,
     });
     loadSongSuggestions();
-  };
-
-  const addToSongLibrary = async (song) => {
-    await fetch(`${API_BASE}/api/SongSuggestions/${song.id}/add-to-library`, {
-      method: "POST",
-      headers: authHeaders,
-    });
-    await loadSongs();
-    alert(`"${song.title}" added to Song Library!`);
   };
 
   // ── Rehearsals CRUD ───────────────────────────────────────────────────────
@@ -1642,11 +1652,11 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                         {isAdmin && song.status === "Pending" && (
                           <div className="mt-6 flex flex-wrap gap-3">
                             <button
-                              onClick={() => approveSuggestion(song.id)}
+                              onClick={() => approveSuggestion(song.id, song.title)}
                               className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 font-bold text-slate-950"
                             >
                               <CheckCircle size={18} />
-                              Approve
+                              Approve &amp; Add to Library
                             </button>
                             <button
                               onClick={() => rejectSuggestion(song.id)}
@@ -1654,18 +1664,6 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                             >
                               <XCircle size={18} />
                               Reject
-                            </button>
-                          </div>
-                        )}
-
-                        {isAdmin && song.status === "Approved" && (
-                          <div className="mt-6">
-                            <button
-                              onClick={() => addToSongLibrary(song)}
-                              className="inline-flex items-center gap-2 rounded-xl bg-amber-400 px-4 py-2 font-bold text-slate-950"
-                            >
-                              <Music size={18} />
-                              Add to Song Library
                             </button>
                           </div>
                         )}

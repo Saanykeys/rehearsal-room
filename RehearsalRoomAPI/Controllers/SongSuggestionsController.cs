@@ -88,12 +88,17 @@ namespace RehearsalRoomAPI.Controllers
                 return BadRequest("Only approved suggestions can be added to the song library.");
             }
 
+            var orgId = int.TryParse(User.FindFirst("OrganizationId")?.Value, out var oid) ? oid : 0;
+
             var song = new Song
             {
                 Title = suggestion.Title,
+                Artist = suggestion.Artist,
                 YoutubeLink = suggestion.YouTubeLink,
                 Key = "",
-                Category = "Worship"
+                Category = "Worship",
+                OrganizationId = orgId,
+                CreatedAt = DateTime.UtcNow
             };
 
             _context.Songs.Add(song);

@@ -869,7 +869,6 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
     { name: "Attendance", icon: ClipboardCheck, roles: ["Music Director", "Team Member"] },
     { name: "Team Chat", icon: MessageSquare, roles: ["Music Director", "Team Member"] },
     { name: "Members", icon: Users, roles: ["Music Director"] },
-    { name: "Waitlist", icon: ClipboardCheck, roles: ["Music Director"] },
     { name: "Settings", icon: Settings, roles: ["Music Director", "Team Member"] },
   ];
 

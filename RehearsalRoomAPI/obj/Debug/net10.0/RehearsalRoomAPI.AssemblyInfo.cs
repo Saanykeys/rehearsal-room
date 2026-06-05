@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("RehearsalRoomAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+208c13f283baca8d878da1deceb2efd5cc52cb8b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0ad14b8053880944a02ac957c16b55593b77741d")]
 [assembly: System.Reflection.AssemblyProductAttribute("RehearsalRoomAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("RehearsalRoomAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -168,6 +168,21 @@ using (var scope = app.Services.CreateScope())
         ");
 
         db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""TeamChatMessages"" (
+                ""Id""             SERIAL PRIMARY KEY,
+                ""OrganizationId"" INTEGER NOT NULL DEFAULT 0,
+                ""AuthorId""       INTEGER NOT NULL DEFAULT 0,
+                ""AuthorName""     TEXT NOT NULL DEFAULT '',
+                ""Body""           TEXT NOT NULL DEFAULT '',
+                ""CreatedAt""      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        ");
+        db.Database.ExecuteSqlRaw(@"
+            CREATE INDEX IF NOT EXISTS ""IX_TeamChatMessages_OrganizationId""
+            ON ""TeamChatMessages"" (""OrganizationId"")
+        ");
+
+        db.Database.ExecuteSqlRaw(@"
             CREATE TABLE IF NOT EXISTS ""Organizations"" (
                 ""Id""         SERIAL PRIMARY KEY,
                 ""Name""       TEXT NOT NULL DEFAULT '',
@@ -227,6 +242,19 @@ using (var scope = app.Services.CreateScope())
         ");
         db.Database.ExecuteSqlRaw(@"
             CREATE INDEX IF NOT EXISTS IX_RehearsalMessages_RehearsalEventId ON RehearsalMessages (RehearsalEventId)
+        ");
+        db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS TeamChatMessages (
+                Id             INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                OrganizationId INTEGER NOT NULL DEFAULT 0,
+                AuthorId       INTEGER NOT NULL DEFAULT 0,
+                AuthorName     TEXT    NOT NULL DEFAULT '',
+                Body           TEXT    NOT NULL DEFAULT '',
+                CreatedAt      TEXT    NOT NULL DEFAULT ''
+            )
+        ");
+        db.Database.ExecuteSqlRaw(@"
+            CREATE INDEX IF NOT EXISTS IX_TeamChatMessages_OrganizationId ON TeamChatMessages (OrganizationId)
         ");
 
         db.Database.ExecuteSqlRaw(@"

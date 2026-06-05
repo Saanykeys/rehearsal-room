@@ -108,6 +108,12 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
   const [announcementLoading, setAnnouncementLoading] = useState(false);
   const [announcementMsg, setAnnouncementMsg] = useState("");
 
+  // ── Team Chat ─────────────────────────────────────────────────────────────
+  const [teamChatMessages, setTeamChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatSending, setChatSending] = useState(false);
+  const chatBottomRef = useRef(null);
+
   // ── Attendance ───────────────────────────────────────────────────────────
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [attendanceLoaded, setAttendanceLoaded] = useState(false);
@@ -211,6 +217,50 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
     }
   };
 
+  const loadTeamChat = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/TeamChat`, { headers: authHeaders });
+      if (res.ok) {
+        const data = await res.json();
+        setTeamChatMessages(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error("Failed to load team chat", err);
+    }
+  };
+
+  const sendTeamMessage = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim() || chatSending) return;
+    setChatSending(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/TeamChat`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ body: chatInput.trim() }),
+      });
+      if (res.ok) {
+        const msg = await res.json();
+        setTeamChatMessages((prev) => [...prev, msg]);
+        setChatInput("");
+        setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+      }
+    } catch (err) {
+      console.error("Failed to send message", err);
+    } finally {
+      setChatSending(false);
+    }
+  };
+
+  const deleteTeamMessage = async (id) => {
+    try {
+      await fetch(`${API_BASE}/api/TeamChat/${id}`, { method: "DELETE", headers: authHeaders });
+      setTeamChatMessages((prev) => prev.filter((m) => m.id !== id));
+    } catch (err) {
+      console.error("Failed to delete message", err);
+    }
+  };
+
   const postAnnouncement = async () => {
     if (!announcementForm.title.trim()) {
       setAnnouncementMsg("Please enter a title.");
@@ -265,19 +315,34 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
     loadMembers();
     loadAttendanceRecords();
     loadAnnouncements();
+    loadTeamChat();
     if (isAdmin) loadWaitlist();
 
-    // Poll every 30 seconds so team members see new announcements,
-    // rehearsals, and song library changes without refreshing the page
-    const poll = setInterval(() => {
+    // Poll every 30 seconds for announcements, rehearsals, songs
+    const slowPoll = setInterval(() => {
       loadAnnouncements();
       loadRehearsals();
       loadSongs();
       loadSongSuggestions();
     }, 30000);
 
-    return () => clearInterval(poll);
+    // Poll every 5 seconds for new chat messages
+    const chatPoll = setInterval(() => {
+      loadTeamChat();
+    }, 5000);
+
+    return () => {
+      clearInterval(slowPoll);
+      clearInterval(chatPoll);
+    };
   }, []);
+
+  // Scroll to bottom of chat when tab is opened or messages load
+  useEffect(() => {
+    if (activeTab === "Team Chat") {
+      setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    }
+  }, [activeTab, teamChatMessages.length]);
 
   // ── Songs CRUD ────────────────────────────────────────────────────────────
   const openAddSongForm = () => {
@@ -802,6 +867,7 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
     { name: "Suggestions", icon: Lightbulb, roles: ["Music Director", "Team Member"] },
     { name: "Rehearsals", icon: CalendarDays, roles: ["Music Director", "Team Member"] },
     { name: "Attendance", icon: ClipboardCheck, roles: ["Music Director", "Team Member"] },
+    { name: "Team Chat", icon: MessageSquare, roles: ["Music Director", "Team Member"] },
     { name: "Members", icon: Users, roles: ["Music Director"] },
     { name: "Waitlist", icon: ClipboardCheck, roles: ["Music Director"] },
     { name: "Settings", icon: Settings, roles: ["Music Director", "Team Member"] },
@@ -2140,6 +2206,86 @@ export default function AdminDashboard({ currentUser, token, onLogout }) {
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {/* ── Team Chat Tab ───────────────────────────────────────────── */}
+          {activeTab === "Team Chat" && (
+            <div className="mt-8 flex flex-col" style={{ height: "calc(100vh - 160px)" }}>
+              <div className="mb-4 flex items-center gap-3">
+                <MessageSquare size={22} className="text-amber-400" />
+                <div>
+                  <h2 className="text-2xl font-black">Team Chat</h2>
+                  <p className="text-sm text-slate-400">Message your whole team — no group text needed.</p>
+                </div>
+              </div>
+
+              {/* Message list */}
+              <div className="flex-1 overflow-y-auto rounded-3xl border border-white/10 bg-white/5 p-4 space-y-3">
+                {teamChatMessages.length === 0 ? (
+                  <div className="flex h-full flex-col items-center justify-center text-center text-slate-500">
+                    <MessageSquare size={40} className="mb-3 opacity-40" />
+                    <p className="font-bold">No messages yet.</p>
+                    <p className="text-sm">Be the first to say something!</p>
+                  </div>
+                ) : (
+                  teamChatMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.isOwn ? "justify-end" : "justify-start"}`}
+                    >
+                      <div className={`group relative max-w-[75%] ${msg.isOwn ? "items-end" : "items-start"} flex flex-col gap-1`}>
+                        {!msg.isOwn && (
+                          <span className="ml-1 text-xs font-bold text-amber-400">{msg.authorName}</span>
+                        )}
+                        <div
+                          className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                            msg.isOwn
+                              ? "bg-amber-400 text-slate-950 font-medium rounded-br-sm"
+                              : "bg-slate-800 text-slate-100 rounded-bl-sm"
+                          }`}
+                        >
+                          {msg.body}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-600">
+                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                          {(msg.isOwn || isAdmin) && (
+                            <button
+                              onClick={() => deleteTeamMessage(msg.id)}
+                              className="hidden text-xs text-red-400 hover:text-red-300 group-hover:inline"
+                            >
+                              delete
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+                <div ref={chatBottomRef} />
+              </div>
+
+              {/* Input */}
+              <form onSubmit={sendTeamMessage} className="mt-3 flex gap-3">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Send a message to your team..."
+                  className="flex-1 rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-amber-400"
+                  disabled={chatSending}
+                />
+                <button
+                  type="submit"
+                  disabled={chatSending || !chatInput.trim()}
+                  className="flex items-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 font-black text-slate-950 transition-all hover:scale-[1.02] disabled:opacity-50"
+                >
+                  <Send size={18} />
+                  {chatSending ? "…" : "Send"}
+                </button>
+              </form>
             </div>
           )}
 

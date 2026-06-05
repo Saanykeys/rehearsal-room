@@ -41,6 +41,8 @@ namespace RehearsalRoomAPI.Data
 
         public DbSet<RehearsalMessage> RehearsalMessages { get; set; }
 
+        public DbSet<TeamChatMessage> TeamChatMessages { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // Unique invite code per organization
